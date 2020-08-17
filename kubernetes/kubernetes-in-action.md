@@ -150,13 +150,13 @@ pod의 specification에 각 컨테이너 별 liveness probe를 지정할 수 있
 # HTTP GET probe
 ...
 spec:
-	containers:
-	- image: image_name
-		name: container_name
-		livenessProbe:
-		httpGet:
-			path: /
-			port: 8080
+  containers:
+    - image: image_name
+      name: container_name
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 8080
 ```
 
 crash 된 컨테이너의 로그 확인하기

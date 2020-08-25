@@ -285,3 +285,389 @@ parallelism : job을 동시에 몇개 수행할것인지
 - `startingDeadlineSeconds` : cron 잡이 너무 늦게 시작하지 않도록 한다
 - `spec.backoffLimit` : 잡 재시도 횟수
 - `spec.schedule` : "cron format" 크론 잡으로 만들 수 있다
+
+### 5장 서비스 : 클라이언트가 파드를 검색하고 통신을 가능하게 함
+
+**파드에 직접 접근하는게 부적합한 이유**
+
+- 파드는 일시적, 노드의 공간 확보, replicas 변경, 노드 장애 등으로 언제든지 사라질 수 있다.
+- 파드의 IP주소는 스케줄링 된 후 파드가 시작되기 직전에 할당되어 미리 알 수 없다.
+- 수평 스케일링 된 동일한 기능을 하는 파드는 구분없이 하나의 엔드포인트를 통해 접근이 가능해야 한다.
+
+**그럼 어떻게 접근할 수 있나?**
+
+서비스
+
+**외부 클라이언트 - 고정된 IP 주소 - 서비스 - 파드**
+
+**서비스는 지원하는 파드를 어떻게 알아낼까?**
+
+레이블 셀렉터
+
+**서비스를 쉽게 생성하는 방법**
+
+kubectl expose
+
+**yaml descriptor를 사용해서 서비스 생성하기**
+
+```yaml
+# kubia-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+	name: kubia
+spec:
+	ports:
+	- port: 80
+		targetPort: 8080
+	selector:
+		app: kubia
+```
+
+`kubectl create -f kubia-service.yaml`
+
+**서비스 확인하기**
+
+```bash
+$ kubectl get svc
+NAME   CLUSTER-IP     EXTERNAL-IP  PORT(S)  AGE
+kubia  10.111.248.14  <none>       80/TCP   6m
+```
+
+Cluster-IP는 클러스터 내부에서만 접근할 수 있다.
+
+**외부에서 실행중인 컨테이너에 명령어 실행**
+
+`kubectl exec <pod-name> -- curl -s <service-cluster-ip>`
+
+`--` : kubectl 명령어의 마지막을 의미 (like `';'`), `--` 뒤의 내용은 파드 내부에서 실행된다.
+
+`-s, --silent` : Silent  or  quiet mode. Don't show progress meter or error messages.  Makes Curl mute. It will still output the data you ask for, potentially even to the terminal stdout unless you redirect it.
+
+**💡DSR 설정에 변화는 없을까?**
+
+**세션 어피니티**
+
+하나의 서비스에 연결된 파드가 여러개일 경우 디스크립터에서 세션 어피니티를 설정할 수 있다.
+
+```bash
+spec:
+	sessionAffinity: ClientIP # 동일한 client 요청은 동일한 pod로 전달된다.
+```
+
+사용 가능한 옵션은 None or ClientIP
+
+k8s 서비스는 HTTP 수준이 아닌 TCP, UDP 패킷을 처리하기 때문에(페이로드는 신경쓰지 않는다.) 쿠키 기반 세션 어피니티 옵션은 없다.
+
+**💡k8s 서비스의 HTTP와 TCP 이해하기**
+
+**멀티 포트 서비스**
+
+서비스는 단일 포트만 노출하지만 멀티 포트 서비스를 통해 여러 포트를 지원할 수도 있다.
+
+```yaml
+# kubia-multi-port-service.yaml
+...
+spec:
+	ports:
+	- name: http
+		port: 80
+		targetPort: 8080
+	- name: https
+		port: 443
+		targetPort: 8443
+	selector:
+		app: kubia
+```
+
+멀티 포트 서비스를 만드려면 포트 이름(name)을 지정해야 한다.
+
+레이블 셀렉터는 서비스 전체에 적용되기 때문에 포트 별 셀렉터를 구성할 수는 없다. 
+
+**포트 번호 대신 지정된 이름으로 접근하기**
+
+서비스 스펙을 좀 더 명확하게 하기 위해 파드에서 포트 이름 지정
+
+```yaml
+kind: Pod
+spec:
+	containers:
+		- name: kubia
+		ports:
+		- name: http
+			containerPort: 8080
+		- name: https
+			containerPort: 8443
+```
+
+서비스에서 지정된 포트 이름 사용
+
+```yaml
+kind: Service
+spec:
+	ports:
+	- name: http
+		port: 80
+		targetPort: http
+	- name: https
+		port: 443
+		targetPort: https
+```
+
+**클라이언트 파드에서 서비스의 IP를 알아내는 방법**
+
+- **환경변수**
+
+    k8s 시작 시점에 각 서비스를 가리키는 환경변수 세트를 초기화한다. 이를 통해 파드가 생성되기 전 존재하는 서비스 정보를 환경변수를 통해 알 수 있다.
+
+    ```bash
+    $ kubectl exec <pod-name> env
+    ..
+    KUBERNETES_SERVICE_HOST=10.123.12.13
+    KUBERNETES_SERVICE_PORT=443
+    ..
+    KUBIA_SERVICE_HOST=12.123.11.123
+    KUBIA_SERVICE_PORT=80
+    ```
+
+    이렇게 IP, Port를 찾는 대신 보통 DNS를 사용하지 않을까? 아래에서 살펴본다.
+
+- **DNS**
+
+    kube-system 네임스페이스에 kube-dns라는 서비스가 존재한다.
+
+    클러스터 내 모든 파드는 자동으로 해당 DNS를 사용한다. (dnsPolicy로 사용 여부 설정 가능)
+
+    그래서 서비스의 이름을 알고 있는 클라이언트 파드는 환경변수 대신 FQDN으로 접근이 가능하다.
+
+- **FQDN**
+
+    <서비스이름>.<네임스페이스>.<클러스터.도메인.접미사>
+
+    kubia.default.svc.cluster.local
+
+    이 경우 80(HTTP), 5432(Postgres) 등 표준 포트를 사용하지 않는 경우 환경변수에서 포트를 따로 가져와야 한다.
+
+    통신하려는 파드가 동일한 네임스페이스에 있는 경우 네임스페이스와 접미사는 생략할 수 있다.
+
+    파드 컨테이너 내부에 DNS resolver가 처리 (`/etc/resolv.conf`)
+
+**서비스 IP 대신 DNS 사용**
+
+- `container $ curl http://kubia.default.svc.cluster.local`
+- `container $ curl http://kubia.default`
+- `container $ curl http://kubia`
+
+같은 네임스페이스에 있을 경우 위 세가지 모두 가능
+
+파드의 컨테이너 내 shell 실행
+
+`kubectl exec -it <container-name> bash`
+
+💡 서비스의 클러스터 IP가 가상 IP이기 때문에 서비스 포트와 결합된 경우만 의미가 있어 ping은 동작하지 않는다. 그래서 서비스 헬스체크를 핑으로 하면 엉뚱한 결과를 얻을 수도 있다. (11장에서 알아본다.)
+
+**클러스터 외부 서비스와 연결**
+
+서비스는 파드에 직접 연결되지 않는다.
+
+서비스의 파드 셀렉터를 통해 엔드포인트 목록을 생성한다.
+
+```
+$ kubectl describe svc kubia
+Name: kubia
+...
+Selector app=kubia
+...
+Endpoints: <파드 IP>.<포트>, <파드 IP>.<포트>...
+```
+
+엔드포인트 또한 리소스이기 때문에 kubectl get 으로 조회할 수 있다.
+
+```
+$ kubectl get endpoints kubia
+NAME   ENDPOINT       AGE
+kubia  10.100.1.0:80  1h
+```
+
+파드 셀렉터는 서비스로 들어오는 요청에 직접 관여하지 않고 미리 엔드포인트 리소스를 만들며 서비스 프록시가 사용할 수 있도록 한다.
+
+**엔드포인트와 서비스 분리**
+
+엔드포인트는 서비스와 분리해 별도로 관리할 수 있다.
+
+서비스에 파드 셀렉터를 지정하지 않고 엔드포인트 리소스를 서비스와 같은 이름으로 만들면 기존과 같이 사용할 수 있다.
+
+❓파드셀렉터도 지정하고 엔드포인트 리소스도 생성하면?
+
+```
+...
+kind: Endpoints
+metadata:
+	name: external-service
+subsets:
+	- address:
+		- ip: 1.2.3.4
+		- ip: 1.1.1.1
+	ports:
+	- port: 80
+```
+
+잘 모르겠다
+
+내부 파드 > 서비스 > 외부 파드(엔드포인트)?
+
+책: 외부 서비스를 k8s 내 파드로 마이그레이션 할 경우 서비스에 셀렉터를 추가해 엔드포인트를 자동으로 관리 가능. > 서비스 내 구현이 달라져도 엔드포인트는 동일하게 유지 가능
+
+**FQDN으로 더 쉽게 외부 서비스 참조하기**
+
+서비스 리소스의 spec.type을 ExternalName으로 설정한다.
+
+[api.somecorp.com](http://api.somecorp.com) 라는 공개 API가 있다고 가정
+
+```
+...
+kind: Service
+metadata:
+	name: external-service
+...
+spec:
+	type: ExternalName
+	externalName: api.somecorp.com # 실제 서비스의 FQDN
+...
+```
+
+책에서는 [someapi.somecorp.com](http://someapi.somecorp.com) 으로 돼있던데 오타?
+
+api... 대신 external-service(.default.svc.cluster.local)로 외부 서비스에 연결할 수 있다.
+
+잘 모르겠다
+
+나중에 externalName 을 변경하거나 유형을 ClusterIP로 변경하고 서비스 스펙을 만들어 스펙을 수정하면 나중에 다른 서비스를 가리킬 수 있다.
+
+ExternalService는 CNAME DNS 레코드를 생성하고 서비스 프록시를 완전히 무시한 채 외부 서비스로 연결되기 때문에 ClusterIP를 얻을 수 없다.
+
+**여기까지가 클러스터 내부 파드 > 서비스 > 내부 혹은 외부에 대한 내용**
+
+**외부 > 서비스 > 내부 파드**
+
+몇가지 방법
+
+- NodePort: 노드 자체에서 포트 오픈, 해당 포트의 트래픽을 서비스로 전달
+    - 서비스 > 내부 IP & 포트 뿐만 아니라 모든 노드의 포트로도 접근 가능
+- LoadBalancer: k8s 내 프로비저닝 된 LB로 서비스 접근 가능
+    - 클라이언트 > 로드밸런서 IP > 모든 노드의 노드포트
+- 인그레스: 단일 IP로 여러 서비스 노출 가능
+    - 뒤에서 설명한다.
+
+**NodePort**
+
+모든 노드에 특정 포트(모든 노드가 동일)를 할당한다.
+
+ClusterIP와 유사하지만 서비스 내부 클러스터 IP 뿐만 아니라 노드의 IP, 포트도 사용할 수 있다는 차이점이 있다
+
+```
+kind: Service
+spec:
+	type: NodePort
+	ports:
+	- port: 80
+		targetPort: 8080
+		nodePort: 30123 # 생략하면 임의로 지정
+```
+
+```
+$ kubectl get svc service-name
+NAME      CLUSTER-IP  EXTERNAL-IP  PORT(S)     
+svc-name  1.2.3.4     <nodes>      80:30123/TCP
+```
+
+서비스에는 다음과 같이 접근할 수 있다.
+
+- 1.2.3.4:80
+- <노드1 IP>.30123
+- <노드2 IP>.30123 ...
+
+**외부 클라이언트 > 노드:노드포트 > 서비스 > 파드**
+
+노드 1 IP > .. > 노드 2 파드 가 될수도 있다.
+
++) 노드포트에 접근하려면 노드에 포트 오픈 및 방화벽 설정을 해주어야 한다.
+
+모든 노드 IP 가져오기
+
+`$ kubectl get nodes -p jsonpath='{.items[*].status.addresses[?(@.type=="ExternalIP")].address}'`
+
+- items 속성의 모든 항목을 조회한다.
+- 각 항목의 status 속성을 조회한다.
+- addresses 에서 ExternalIP 타입만 필터링한다.
+- address를 가져온다
+
+어떤 노드에 요청을 보내도 상관없지만 HA를 위해 노드들 앞에 LB를 붙이는게 좋다.
+
+**로드밸런서 서비스 생성**
+
+```
+kind: Service
+spec:
+	type: LoadBalancer
+	ports:
+	- port: 80
+		targetPort: 8080
+		# NodePort 지정 x, (해도 된다)
+```
+
+로드밸런서는 노드포트 서비스의 확장
+
+스펙에서 특정 노드포트를 지정하지 않으면 쿠버네티스가 포트를 선택한다
+
+**외부 클라이언트 > 로드밸런서 > 노드포트 > 서비스 > 파드**
+
+위에서 이야기한 방화벽 설정도 필요 없다.
+
+**노드포트로 외부 연결 시 주의사항**
+
+노드 포트로 서비스에 접속할 경우 다른 노드의 파드가 선택되면 추가 홉이 발생한다.
+
+spec.externalTrafficPolicy: Local을 통해 현재 노드의 파드에만 트래픽을 전달한다.
+
+대신 파드에 부하가 균등하게 분배되지 않는다 ex) 2노드 3파드 파드 A : B : C = 50 : 25 : 25
+
+클러스터 IP 보존 불가
+
+클러스터 내 클라이언트 > 서비스 연결 시 노드포트는 SNAT(소스 네트워크 주소 변환)가 발생하 클라이언트 IP를 알아야하는 app의 경우 문제가 될 수 있다(예를들면 req log)
+
+위 local external traffic policy는 이문제를 해결한다
+
+**인그레스**
+
+- 노드밸런서 : 서비스 = 1 : 1
+- 인그레스 : 서비스 = 1 : N
+    - 요청한 host와 path에 따라 서비스를 분기할 수 있다
+        - [a.host.com/A](http://a.host.com/A) > service AA
+        - [b.host.com/A](http://b.host.com/A) > service BA
+        - [b.host.com/B](http://b.host.com/B) > service BB
+
+인그레스는 HTTP 계층에서 동작하기때문에 서비스에서 지원하지 못하던 쿠키 기반 세션 어피니티도 지원 가능하다.
+
+인그레스를 사용하기 위해서는 클러스터에 인그레스 컨트롤러를 실행해야 한다.
+
+```
+kind: Ingress
+spec:
+	rules:
+	- host: kubia.example.com # 인그레스가 이 도메인 이름을 서비스에 매핑한다
+		http:
+		paths:
+			- path: /
+				backend:
+					serviceName: kubia-nodeport
+					servicePort: 80
+```
+
+[kubia.example.com](http://kubia.example.com) 요청은 kubia-nodeport 80포트로 전달된다.
+
+인그레스의 IP로 도메인을 연결하자
+
+`$ kubectl get ingresses`
+
+**인그레스가 필요한 경우**

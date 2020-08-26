@@ -1,6 +1,6 @@
 # 스프링 인 액션
 
-## 1장 스프링 살펴보기
+## 1장 스프링 시작하기
 
 ### 프로젝트 빌드 주요 항목
 - mvnw, mvnw.cmd : local에 maven이 없어도 빌드할 수 있도록 해주는 파일
@@ -27,3 +27,9 @@ A: 주로 사용되는 라이브러리에 대한 의존성 관리
 - @SpringBootConfiguration
 - @EnableAutoconfiguration
 - @ComponentScan
+
+## 2장 웹 애플리케이션 개발하기
+
+> pom.xml에 starter 의존성을 쉽게 추가하는 [IntelliJ edit-starter plugin](https://github.com/hdzitao/idea-editstarters-plugin)
+
+view만 반환하는 컨트롤러는 별도 클래스를 생성하지 않고 WebMvcConfigurer의 addViewControllers를 통해 등록할 수 있다.

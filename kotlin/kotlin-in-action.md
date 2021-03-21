@@ -228,3 +228,230 @@ fun main(args: Array<String>) {
 - try 도 expression 으로 사용할 수 있다.
   - if 와 달리 반드시 본문을 {} 로 감싸야 한다.
 - 코틀린은 모든 exception 을 unchecked 로 처리한다.
+
+# Part 3. 함수 정의와 호출
+
+**컬렉션**
+
+코틀린에서는 자바 컬렉션과 코틀린 자체 컬렉션을 모두 지원한다.
+
+**자바 컬렉션**
+
+```kotlin
+val list = arrayListOf(1,2,3)
+val set = hashSetOf(1,2,3)
+val map = hashMapOf(1 to "one", 2 to "two", 3 to "three")
+
+println(list.javaClass) // javaClass == getClass()
+>> class java.util.ArrayList
+```
+
+- `to` 도 일반 함수이며 뒤에서 자세히 배운다.
+- 자바 컬렉션을 사용하기 때문에 기존 자바 코드와 상호작용하기 쉽다.
+
+**코틀린 컬렉션**
+
+자바 컬렉션에 비해 더 많은 기능을 제공한다.
+
+```kotlin
+val strings = listOf("first", "second", "fourteenth")
+println(string.last())
+
+val numbers = setOf(1, 14, 2)
+println(numbers.max())
+```
+
+**이름 붙인 인자**
+
+```kotlin
+val result1 = joinToString(collection, ", ", "[", "]")
+val result2 = joinToString(collection, separator = ", ", prefix = "[", postfix = "]")
+```
+
+**디폴트 파라미터**
+
+```kotlin
+fun <T> joinToString(
+    collection: Collection<T>,
+    separator: String = ", ",
+    prefix: String = "[",
+    postfix: String = "]"
+)
+
+val result1 = joinToString(collection)
+```
+
+**확장 함수**
+
+원하는 클래스의 멤버 함수처럼 동작하는 함수를 클래스 밖에서 정의할 수 있다.
+
+```
+package strings
+fun String.lastChar(): Cahr = this.get(this.length -1)
+
+println("Kotlin".lastChar())
+```
+- `String.lastChar()`에서 클래스 이름인 `String`을 수신 객체 타입(receiver type) 이라고 한다.
+- `this.get..`에서 함수가 호출되는 대상인 `this`를 수신 객체(receiver object) 라고 한다.
+- 일반 메소드와 마찬가지로 확장함수 본문에서도 `this`를 생략 할 수 잇다.
+
+```kotlin
+fun String.lastChar(): Cahr = get(length -1)
+```
+
+- 다만 확장함수에서 receiver type 의 private, protect 멤버를 사용 할 수는 없다.
+
+```kotlin
+import strings.lastChar
+
+import strings.*
+
+import strings.lastChar as last
+```
+
+- 확장 함수를 사용하기 위해서는 사용하는 코드에서 import를 해야 한다.
+- 함수 이름이 충돌하는 경우 `as` 를 통해 이름을 바꿔 해결할 수 있다.
+- 확장 함수는 정적 메소드와 같이 동작하기 때문에 하위 클래스에서 오버라이드 할 수 없다.
+- 확장 함수와 클래스의 멤버 함수가 이름, 시그니처 모두 동일하다면 멤버 함수가 호출된다.
+
+**확장 프로퍼티**
+
+```kotlin
+val String.lastChar: Char
+    get() = get(length - 1)
+var StringBuilder.lastChar: Char
+    get() = get(length - 1)
+    set(value: Char) {
+        this.setCharAt(length - 1, value)
+    }
+```
+
+- 확장 프로퍼티는 기존 클래스에 필드를 추가할 방법이 없기 때문에 실제로 상태를 저장하지는 않고 코드 간소화에만 도움을 준다.
+- 기본 getter 구현을 제공하지 않기 때문에 최소한 getter 는 구현해야 한다.
+
+**컬렉션 처리**
+
+앞서 살펴봤던 코틀린 컬렉션의 추가 기능은 자바 컬렉션에 확장 함수를 더해 제공되고 있다.
+
+**가변 인자**
+
+```kotlin
+fun myfun(vararg values: String) { ... }
+```
+
+배열을 넘기고 싶을 때 자바는 그냥 넘길 수 있지만 코틀린은 스프레드 연산자를 통해 배열을 명시적으로 풀어야 한다.
+
+```kotlin
+fun main(args: Array<String>) {
+    val list = listOf("args: ", *args)
+    println(list)
+}
+```
+
+**중위 호출**
+
+앞서 map을 초기화 할때 `to` 함수를 사용했는데 이렇게 사용하는 방식을 중위 호출 이라고 한다.
+
+```kotlin
+val map = hashMapOf(1 to "one", 2 to "two", 3 to "three")
+```
+
+- 중위 호출은 수신 객체와 유일한 메소드 인자 사이에 메소드 이름을 넣어 사용한다.
+    - `1.to("one")`
+    - `1 to "one"`
+- 함수를 중위 호출 가능하게 만들기 위해서는 infix 라는 prefix 를 붙여준다.
+    - `infix fun Any.to(other: Any) = Pair(this, other)`
+
+**구조 분해 선언**
+
+```kotlin
+val (number, name) = 1 to "one"
+```
+
+- 위와 같이 선언하는 것을 구조 분해 선언이라고 한다.
+- 7장에서 자세히 배운다.
+
+**문자열과 정규식**
+
+- 코틀린 문자열은 자바 문자열과 같다
+- 다만 조금 더 명확하고 편리한 사용을 위한 확장 함수를 제공한다.
+
+```kotlin
+fun main(args: Array<String>) {
+    println("12.345-6.A".split("\\.|-".toRegex()))
+}
+```
+
+- 자바와 달리 일반 문자열과 정규식을 처리하는 함수가 분리되어 있어 쉽게 알 수 있다.
+
+```kotlin
+fun main(args: Array<String>) {
+    println("12.345-6.A".split(".", "-"))
+}
+```
+
+- 여러개의 구분자를 지원하는 함수도 제공한다.
+
+```kotlin
+fun parsePath(path: String) {
+    val directory = path.substringBeforeLast("/")
+    val fullName = path.substringAfterLast("/")
+
+    val fileName = fullName.substringBeforeLast(".")
+    val extension = fullName.substringAfterLast(".")
+
+    println("Dir: $directory, name: $fileName, ext: $extension")
+}
+
+fun main(args: Array<String>) {
+    parsePath("/Users/yole/kotlin-book/chapter.adoc")
+}
+```
+
+- 다양한 케이스의 편리한 기능을 제공한다.
+
+```kotlin
+val kotlinLogo = """| //
+                   .|//
+                   .|/ \"""
+
+fun main(args: Array<String>) {
+    println(kotlinLogo.trimMargin("."))
+}
+```
+
+- `"""` 로 감싼 문자열은 이스케이프를 할 필요가 없다.
+
+**로컬 함수와 확장**
+
+```kotlin
+class User(val id: Int, val name: String, val address: String)
+
+fun User.validateBeforeSave() {
+    fun validate(value: String, fieldName: String) {
+        if (value.isEmpty()) {
+            throw IllegalArgumentException(
+               "Can't save user $id: empty $fieldName")
+        }
+    }
+
+    validate(name, "Name")
+    validate(address, "Address")
+}
+
+fun saveUser(user: User) {
+    // User.validateBeforeSave를 여기에 정의 할 수도 있지만
+    // 중첩된 함수의 깊이가 너무 깊어지는 것을 방지하기 위해 권장하지는 않는다.
+    user.validateBeforeSave()
+
+    // Save user to the database
+}
+
+fun main(args: Array<String>) {
+    saveUser(User(1, "", ""))
+}
+
+```
+
+- User 클래스의 확장함수로 선언함으로써 내부 프로퍼티에 직접 접근이 가능하다.
+- User 클래스와 validate 로직을 분리할 수 있다.

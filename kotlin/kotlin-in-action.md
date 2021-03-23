@@ -291,7 +291,7 @@ val result1 = joinToString(collection)
 
 ```
 package strings
-fun String.lastChar(): Cahr = this.get(this.length -1)
+fun String.lastChar(): Char = this.get(this.length -1)
 
 println("Kotlin".lastChar())
 ```
@@ -330,8 +330,9 @@ var StringBuilder.lastChar: Char
     }
 ```
 
-- 확장 프로퍼티는 기존 클래스에 필드를 추가할 방법이 없기 때문에 실제로 상태를 저장하지는 않고 코드 간소화에만 도움을 준다.
+- 확장 프로퍼티는 기존 클래스에 필드를 추가할 방법이 없기 때문에 상태를 가질 수는 없다.
 - 기본 getter 구현을 제공하지 않기 때문에 최소한 getter 는 구현해야 한다.
+- 초기화 코드도 쓸 수 없다?
 
 **컬렉션 처리**
 

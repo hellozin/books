@@ -470,7 +470,7 @@ fun main(args: Array<String>) {
 - 상태(필드)는 들어갈 수 없다.
 - 자바의 extends와 implements를 모두 콜론(`:`)으로 처리한다.
 
-```
+```kotlin
 interface Clickable {
     fun click()
 }
@@ -483,7 +483,7 @@ class Button : Clickable {
 
 같은 이름과 시그니쳐를 가진 메소드를 가진 두개의 인터페이스를 동시에 구현하면
 
-```
+```kotlin
 interface Clickable {
     fun click()
     fun showOff() = println("I'm clickable!")
@@ -511,7 +511,7 @@ class Button : Clickable, Focusable {
 - 코틀린 클래스는 기본적으로 상속이 불가능하다.
 - 상속하고 싶은 경우 상속을 원하는 클래스, 프로퍼티, 메소드에 open 변경자를 붙여준다.
 
-```
+```kotlin
 interface Clickable {
     fun click()
     fun showOff() = println("I'm clickable!")
@@ -532,7 +532,7 @@ open class RichButton : Clickable {
 - 추상 클래스는 추상 멤버가 존재하기 때문에 하위 클래스에서 이를 구현하는 것이 일반적이다.
 - 이 때문에 추상 멤버 앞에는 open 변경자를 명시할 필요가 없다.
 
-```
+```kotlin
 abstract class Animated {
     abstract fun animate()
     open fun stopAnimating() {} // 추상 멤버가 아닌 경우는
@@ -556,7 +556,7 @@ abstract class Animated {
 - `private`: 클레스 멤버에 지정된 경우 캍은 클래스에서만 볼 수 있고 최상위 선언에 지정된 경우 같은 파일 내에서만 볼 수 있다.
 - 코틀린에는 package-private이 없다.
 
-```
+```kotlin
 internal open class TalkativeButton: Focusable {
 	private fun yell() = println("Hey!")
 	protected fun whisper() = println("Let's talk!")
@@ -573,7 +573,7 @@ fun TalkativeButton.giveSpeech() { // internal 클래스를 public 확장함수�
 
 **중첩 클래스**
 
-```
+```kotlin
 import java.io.Serializable
 
 interface State: Serializable
@@ -611,7 +611,7 @@ public class Button implements View {
 - 코틀린의 중첩 클래스는 기본적으로 내부 클래스가 아니다.
 - 코틀린에서 내부 클래스를 사용하려면 `inner` 변경자를 붙여야 한다.
 
-```
+```kotlin
 class Outer {
     inner class Inner {
         fun getOuterReference(): Outer = this@Outer
@@ -623,7 +623,7 @@ class Outer {
 
 **제한된 하위 클래스**
 
-```
+```kotlin
 interface Expr
 class Num(val value: Int) : Expr
 class Sum(val left: Expr, val right: Expr) : Expr
@@ -639,7 +639,7 @@ fun eval(e: Expr): Int =
 
 - `Expr` 인터페이스가 상속 가능한 상태이기 때문에 분기 시 `else` 문이 꼭 필요하다.
 
-```
+```kotlin
 sealed class Expr {
     class Num(val value: Int) : Expr()
     class Sum(val left: Expr, val right: Expr) : Expr()
@@ -659,13 +659,13 @@ fun eval(e: Expr): Int =
 
 **생성자**
 
-```
+```kotlin
 class User(val name: String)
 ```
 
 - 클래스 이름 뒤 소괄호에 들어가는 코드를 주 생성자(primary constructor)라고 한다.
 
-```
+```kotlin
 class User constructor(_nickname: String) {
     val nickname: String
     init {
@@ -680,21 +680,21 @@ class User constructor(_nickname: String) {
 - 필요한 경우 여러 초기화 블록을 선언할 수 있다.
 - 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.([`this.name](http://this.name) = name`)
 
-```
+```kotlin
 class User(val nickname: String, val isSubscribed: Boolean = true)
 ```
 
 - 디폴트 값을 지정할 수 있다.
 - 모든 파라미터에 디폴트 값을 지정하면 컴파일러가 자동으로 기본 생성자를 만들어주는데 이는 기본 생성자를 필요로 하는 자바 라이브러리와의 통합을 쉽게 해준다.
 
-```
+```kotlin
 open class User(val name: String)
 class MyUser(val nickname: String): User(nickname)
 ```
 
 - 기반 클래스의 생성자를 호출해야 할 경우 위와 같이 값을 지정할 수 있다.
 
-```
+```kotlin
 open class Button
 class RadioButton: Button()
 ```
@@ -702,7 +702,7 @@ class RadioButton: Button()
 - 생성자를 정의하지 않으면 컴파일러가 인자 없이 아무 동작도 하지 않는 생성자를 만들어주고 이를 상속 할 경우 하위 클래스는 반드시 기반 클래스의 생성자를 호출해야 한다.
 - 뒤에 소괄호가 붙는지 여부를 보고 인터페이스인지 클래스인지 확인할 수도 있다.
 
-```
+```kotlin
 class Secretive private constructor () {}
 ```
 
@@ -710,7 +710,7 @@ class Secretive private constructor () {}
 
 **부 생성자**
 
-```
+```kotlin
 open class View {
     constructor(ctx: Context) {}
     constructor(ctx: Context, attr: Attribute) {}

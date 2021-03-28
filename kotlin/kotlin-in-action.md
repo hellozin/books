@@ -1,6 +1,7 @@
 - [Part 1. 코틀린 소개](#part-1-코틀린-소개)
 - [Part 2. 코틀린 기초](#part-2-코틀린-기초)
 - [Part 3. 함수 정의와 호출](#part-3-함수-정의와-호출)
+- [Part 4. 클래스, 객체, 인터페이스](#part-4-클래스-객체-인터페이스)
 
 # Part 1. 코틀린 소개
 
@@ -460,3 +461,267 @@ fun main(args: Array<String>) {
 
 - User 클래스의 확장함수로 선언함으로써 내부 프로퍼티에 직접 접근이 가능하다.
 - User 클래스와 validate 로직을 분리할 수 있다.
+
+# Part 4. 클래스, 객체, 인터페이스
+
+**인터페이스**
+
+- 추상 메소드, 구현된 메소드를 정의할 수 있다.
+- 상태(필드)는 들어갈 수 없다.
+- 자바의 extends와 implements를 모두 콜론(`:`)으로 처리한다.
+
+```
+interface Clickable {
+    fun click()
+}
+class Button : Clickable {
+    override fun click() = println("I was clicked")
+}
+```
+
+- 구현할 메소드에는 override 변경자가 꼭 있어야 한다.
+
+같은 이름과 시그니쳐를 가진 메소드를 가진 두개의 인터페이스를 동시에 구현하면
+
+```
+interface Clickable {
+    fun click()
+    fun showOff() = println("I'm clickable!")
+}
+
+interface Focusable {
+    fun setFocus(b: Boolean) = println("I ${if (b) "got" else "lost"} focus.")
+    fun showOff() = println("I'm focusable!")
+}
+
+class Button : Clickable, Focusable {
+    override fun click() = println("I was clicked")
+
+    override fun showOff() {
+        super<Clickable>.showOff()
+        super<Focusable>.showOff()
+    }
+}
+```
+
+- Button 클래스에서 `showOff()` 메소드를 override하지 않으면 컴파일 에러가 난다.
+
+**상속**
+
+- 코틀린 클래스는 기본적으로 상속이 불가능하다.
+- 상속하고 싶은 경우 상속을 원하는 클래스, 프로퍼티, 메소드에 open 변경자를 붙여준다.
+
+```
+interface Clickable {
+    fun click()
+    fun showOff() = println("I'm clickable!")
+}
+
+open class RichButton : Clickable {
+    fun disable() {} // 하위 클래스에서 오버라이드 할 수 없다.
+    open fun animate() {} // 하위 클래스에서 오버라이드 할 수 있다.
+    override fun click() {} // override 한 메소드는 기본적으로 열려있다.(open)
+		// final override fun click() {} // override 한 메소드를 열고 싶지 않은 경우 final 키워드를 사용한다.
+}
+```
+
+- 기본 상속 가능 상태를 final로 함으로써 다양한 경우에 스마트 캐스트를 적용할 수 있게 되었다.
+
+**추상 클래스**
+
+- 추상 클래스는 추상 멤버가 존재하기 때문에 하위 클래스에서 이를 구현하는 것이 일반적이다.
+- 이 때문에 추상 멤버 앞에는 open 변경자를 명시할 필요가 없다.
+
+```
+abstract class Animated {
+    abstract fun animate()
+    open fun stopAnimating() {} // 추상 멤버가 아닌 경우는
+    fun animateTwice() {} // 여전히 open 여부를 선택할 수 있다.
+}
+```
+
+**상속 제어** **변경자**
+
+- `final`: default, 오버라이드 할 수 없음
+- `open`: 오버라이드 할 수 있음
+- `abstract`: 반드시 오버라이드 해야 함
+- `override`: 상위 멤버를 오버라이드 함
+
+**가시성 변경자 (visivility modifier)**
+
+- `public`: default, 모든 곳에서 볼 수 있다.
+- `internal`: 같은 모듈 안에서만 볼 수 있다.
+    - 모듈: 한번에 컴파일되는 코틀린 파일 그룹
+- `protected`: 클래스 멤버에 지정된 경우 하위 클래스에서만 볼 수 있고 최상위 선언에는 적용할 수 없다.
+- `private`: 클레스 멤버에 지정된 경우 캍은 클래스에서만 볼 수 있고 최상위 선언에 지정된 경우 같은 파일 내에서만 볼 수 있다.
+- 코틀린에는 package-private이 없다.
+
+```
+internal open class TalkativeButton: Focusable {
+	private fun yell() = println("Hey!")
+	protected fun whisper() = println("Let's talk!")
+}
+
+fun TalkativeButton.giveSpeech() { // internal 클래스를 public 확장함수로 참조할 수 없다.
+	yell() // 확장 함수는 private에 접근할 수 없다.
+	whisper() // 확장 함수는 protected에 접근할 수 없다.
+}
+```
+
+- 자바에는 internal에 맞는 가시성이 없기 때문에 public으로 사용된다. 이때문에 접근 범위가 달라지는 문제가 생길 수 있다.
+- 이를 통해 생길 문제를 예방하기 위해 코틀린 컴파일러가 internal 멤버의 이름을 이상하게 바꾼다.
+
+**중첩 클래스**
+
+```
+import java.io.Serializable
+
+interface State: Serializable
+
+interface View {
+    fun getCurrentState(): State
+    fun restoreState(state: State) {}
+}
+
+class Button : View {
+    override fun getCurrentState(): State = ButtonState()
+
+    override fun restoreState(state: State) { /*...*/ }
+
+    class ButtonState : State { /*...*/ }
+}
+
+/* java */
+public class Button implements View {
+	@Override
+	public State get CurrentState() {
+		return new ButtonState();
+	}
+
+	@Override
+	public void restoreState(State state) {..}
+
+	public class ButtonState implements State {..}
+}
+```
+
+- 아래 자바 코드로 직렬화를 하면 `NotSerializableException`이 발생한다.
+    - 자바에서 중첩 클래스는 기본적으로 내부 클래스가 되고 외부 클래스를 묵시적으로 참조한다.
+    - 이 문제를 해결하려면 `ButtonState`를 static class로 지정해야 한다.
+- 코틀린의 중첩 클래스는 기본적으로 내부 클래스가 아니다.
+- 코틀린에서 내부 클래스를 사용하려면 `inner` 변경자를 붙여야 한다.
+
+```
+class Outer {
+    inner class Inner {
+        fun getOuterReference(): Outer = this@Outer
+    }
+}
+```
+
+- 내부 클래스에서 외부 클래스를 참조할 때는 `this@외부클래스` 와 같이 사용한다.
+
+**제한된 하위 클래스**
+
+```
+interface Expr
+class Num(val value: Int) : Expr
+class Sum(val left: Expr, val right: Expr) : Expr
+
+fun eval(e: Expr): Int =
+    when (e) {
+        is Num -> e.value
+        is Sum -> eval(e.right) + eval(e.left)
+        else ->
+            throw IllegalArgumentException("Unknown expression")
+    }
+```
+
+- `Expr` 인터페이스가 상속 가능한 상태이기 때문에 분기 시 `else` 문이 꼭 필요하다.
+
+```
+sealed class Expr {
+    class Num(val value: Int) : Expr()
+    class Sum(val left: Expr, val right: Expr) : Expr()
+}
+
+fun eval(e: Expr): Int =
+    when (e) {
+        is Expr.Num -> e.value
+        is Expr.Sum -> eval(e.right) + eval(e.left)
+    }
+```
+
+- `sealed(봉인된)` 키워드를 사용하면  하위 클래스를 모두 중첩 클래스로 정의해야 한다.
+    - 이 제한은 코틀린 1.1에서 완화되었다. 1.1 부터는 파일 내 아무데서나 하위 클래스를 만들 수 있다.
+- 하위 클래스가 제한되어 별도의 `else` 분기가 필요없어졌다.
+- `sealed` 클래스는 자동으로 `open` 이 된다.
+
+**생성자**
+
+```
+class User(val name: String)
+```
+
+- 클래스 이름 뒤 소괄호에 들어가는 코드를 주 생성자(primary constructor)라고 한다.
+
+```
+class User constructor(_nickname: String) {
+    val nickname: String
+    init {
+        nickname = _nickname
+    }
+}
+```
+
+- 명시적으로 선언하면 위와 같은 형태가 된다.
+- constructor 키워드는 주, 부 생성자 정의를 시작할 때 사용된다.
+- init 키워드는 초기화 블록을 시작한다.
+- 필요한 경우 여러 초기화 블록을 선언할 수 있다.
+- 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.([`this.name](http://this.name) = name`)
+
+```
+class User(val nickname: String, val isSubscribed: Boolean = true)
+```
+
+- 디폴트 값을 지정할 수 있다.
+- 모든 파라미터에 디폴트 값을 지정하면 컴파일러가 자동으로 기본 생성자를 만들어주는데 이는 기본 생성자를 필요로 하는 자바 라이브러리와의 통합을 쉽게 해준다.
+
+```
+open class User(val name: String)
+class MyUser(val nickname: String): User(nickname)
+```
+
+- 기반 클래스의 생성자를 호출해야 할 경우 위와 같이 값을 지정할 수 있다.
+
+```
+open class Button
+class RadioButton: Button()
+```
+
+- 생성자를 정의하지 않으면 컴파일러가 인자 없이 아무 동작도 하지 않는 생성자를 만들어주고 이를 상속 할 경우 하위 클래스는 반드시 기반 클래스의 생성자를 호출해야 한다.
+- 뒤에 소괄호가 붙는지 여부를 보고 인터페이스인지 클래스인지 확인할 수도 있다.
+
+```
+class Secretive private constructor () {}
+```
+
+- 클래스를 외부에서 인스턴스화 하지 못하게 하려면 모든 생성자를 private으로 지정하면 된다.
+
+**부 생성자**
+
+```
+open class View {
+    constructor(ctx: Context) {}
+    constructor(ctx: Context, attr: Attribute) {}
+}
+
+class Button: View {
+    constructor(ctx: Context): this(ctx, MY_STYLE) {}
+    constructor(ctx: Context, attr: Attribute): super(ctx, attr) {}
+}
+```
+
+- constructor 키워드로 지정할 수 있다.
+- `this` 키워드로 클래스 내 다른 생성자를, `super` 키워드로 기반 클래스의 생성자를 호출할 수 있다.
+- 클래스에 주 생성자가 없다면 반드시 상위 클래스를 초기화하거나 다른 생성자에게 위임해야 한다

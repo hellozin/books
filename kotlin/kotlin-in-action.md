@@ -724,4 +724,336 @@ class Button: View {
 
 - constructor 키워드로 지정할 수 있다.
 - `this` 키워드로 클래스 내 다른 생성자를, `super` 키워드로 기반 클래스의 생성자를 호출할 수 있다.
-- 클래스에 주 생성자가 없다면 반드시 상위 클래스를 초기화하거나 다른 생성자에게 위임해야 한다
+- 클래스에 주 생성자가 없다면 반드시 상위 클래스를 초기화하거나 다른 생성자에게 위임해야 한다.
+
+**추상 프로퍼티**
+
+```kotlin
+interface User {
+	val nickname: String
+}
+
+class PrivateUser(override val nickname: String) : User
+
+class SubscribingUser(val email: String) : User {
+    override val nickname: String
+        get() = email.substringBefore('@')
+}
+
+fun getFacebookName(accountId: Int) = "fb:$accountId"
+
+class FacebookUser(val accountId: Int) : User {
+    override val nickname = getFacebookName(accountId)
+}
+```
+
+- 코틀린에서는 인터페이스에 추상 프로퍼티 선언을 넣을 수 있다.
+- 인터페이스는 상태를 가질 수 없기 때문에 구현할 클래스에서 해당 프로퍼티의 값을 처리해야 한다.
+
+```kotlin
+interface User {
+    val email: String
+    val nickname: String
+        get() = email.substringBefore('@')
+}
+```
+
+- `email`은 하위 클래스에서 반드시 오버라이드 해야 한다.
+- `nickname`은 오버라이드 하지 않고 사용할 수 있다.
+
+**Getter와 Setter에서 backing field 접근**
+
+```kotlin
+class User(val name: String) {
+    var address: String = "unspecified"
+        set(value: String) {
+            println("""
+                Address was changed for $name:
+                "$field" -> "$value".""".trimIndent())
+            field = value
+        }
+}
+```
+
+- 커스텀 접근자 내에서 backing field에 접근해 원하는 로직을 추가할 수 있다.
+- 접근은 `field` 라는 특별한 식별자를 통해 할 수 있다.
+- `field` 식별자를 사용하지 않으면 컴파일러가 backing field를 자동으로 생성하지 않는다.
+    - ? 프로퍼티가 val 인 경우에는 게터에 field가 없으면 되지만, var 인 경우에는 게터나 세터 모두에 field가 없어야 한다.
+
+**접근자의 가시성 변경**
+
+- 접근자의 가시성은 기본적으로 프로퍼티의 가시성과 같다.
+- get, set 앞에 가시성 변경자를 추가해 변경할 수 있다.
+
+```kotlin
+class LengthCounter {
+    var counter: Int = 0
+        private set
+
+    fun addWord(word: String) {
+        counter += word.length
+    }
+}
+```
+
+**프로퍼티에 대해 나중에 다룰 내용**
+
+p. 171
+
+**데이터 클래스**
+
+주로 정의하는 메소드들
+
+```kotlin
+class Client(val name: String, val postalCode: Int) {
+
+    override fun equals(other: Any?): Boolean {
+        if (other == null || other !is Client) return false
+        return name == other.name && postalCode == other.postalCode
+    }
+
+		override fun hashCode(): Int = name.hashCode() * 31 + postalCode
+
+    override fun toString() = "Client(name=$name, postalCode=$postalCode)"
+}
+```
+
+- 코틀린은 `==` 연산자 사용 시 equals를 호출한다. 참조 비교는 `===` 를 사용한다.
+
+어떤 클래스가 데이터를 저장하는 역할만 수행한다면 toString, equals, hashCode를 반드시 오버라이드 해야한다. 코틀린은 이런 메소드를 자동으로 생성하고 보이지않게 내부적으로 처리하는 `data` 클래스를 제공한다.
+
+```kotlin
+data class Client(val name: String, val postalCode: Int)
+```
+
+생성되는 메소드
+
+- equals() / hashCode()
+    - 주 생성자의 프로퍼티를 기반으로 생성된다.
+- toString (`"Client(name=Bob, postalCode=973293)"`)
+- copy()
+    - 아래에서 설명한다
+- componentN()
+    - 7장에서 설명한다
+
+**copy 메소드**
+
+- 데이터 클래스는 모든 프로퍼티를 val로 선언해 불변 객체로 유지하기를 권장하지만 원한다면 var을 사용할 수 있다.
+- copy는 불변 객체를 더 편하게 사용할 수 있도록 객체를 복사하며 일부 프로퍼티를 변경할 수 있는 메소드이다.
+
+```kotlin
+data class Client(val name: String, val postalCode: Int)
+
+fun main(args: Array<String>) {
+    val bob = Client("Bob", 973293)
+    println(bob.copy(postalCode = 382555))
+}
+```
+
+**클래스 위임**
+
+- 코틀린은 상위 클래스의 변경이 하위 클래스에 영향을 미치는 단점을 보완하기 위해 기본적으로 final로 취급하고 open을 통해 확장할 수 있도록 했다.
+- 상속을 허용하지 않는 클래스에 새로운 동작을 추가해야 할 경우 주로 사용하는 데코레이터 패턴을 `by` 키워드를 통해 제공한다.
+
+```kotlin
+interface Base {
+    fun getName(): String
+    fun getAge(): Int
+}
+
+class BaseImpl : Base {
+    override fun getName() = "hello"
+    override fun getAge() = 10
+}
+
+class MyBaseImpl(val baseImpl : BaseImpl = BaseImpl()) : Base by baseImpl {
+    override fun getName() = baseImpl.getName() + ", bye"
+}
+```
+
+**object 키워드**
+
+object 키워드를 사용하는 여러 상황
+
+- **객체 선언**(object declaration)은 싱글턴을 정의하는 방법 중 하나이다.
+- **동반 객체**(companion object)는 인스턴스 메소드는 아니지만 어떤 클래스와 관련있는 메소드와 팩토리 메소드를 담을 때 쓰인다. 동반 객체 메소드에 접근할 때는 동반 객체가 포함된 클래스의 이름을 사용할 수 있다.
+- 객체 식은 자바의 **익병 내부 클래스**(anonymous inner class) 대신 쓰인다.
+
+**객체 선언**
+
+- 코틀린은 객체 선언, `object` 키워드를 통해 싱글톤을 쉽게 제공한다.
+- 객체 선언에는 프로퍼티, 메소드, 초기화 블록이 들어갈 수 있지만 주, 부 생성자는 사용할 수 없다.
+- 인터페이스나 클래스를 상속할 수 있다.
+
+```kotlin
+object CaseInsensitiveFileComparator : Comparator<File> {
+    override fun compare(file1: File, file2: File): Int {
+        return file1.path.compareTo(file2.path,
+                ignoreCase = true)
+    }
+}
+
+fun main(args: Array<String>) {
+    println(CaseInsensitiveFileComparator.compare(
+        File("/User"), File("/user")))
+    val files = listOf(File("/Z"), File("/a"))
+    println(files.sortedWith(CaseInsensitiveFileComparator))
+}
+```
+
+- 클래스 내부에서 객체 선언을 사용할 수도 있다.
+
+```kotlin
+data class Person(val name: String) {
+    object NameComparator : Comparator<Person> {
+        override fun compare(p1: Person, p2: Person): Int =
+            p1.name.compareTo(p2.name)
+    }
+}
+```
+
+- 자바에서 object 클래스를 사용하려면 `클래스이름.INSTANCE.*` 와 같은 포멧으로 호출할 수 있다.
+    - `CaseInsensitiveFileComparator.INSTANCE.compare`
+
+**동반 객체**
+
+- 코틀린에는 static 멤버가 없어 최상위 함수나 객체 선언으로 대신할 수 있다.
+- 객체 내의 private 멤버에 접근이 필요한 경우 중첩된 객체 선언을 멤버로 정의해 사용할 수 있다.
+- 이때, `companion` 키워드를 사용하면 상위 클래스의 이름으로 객체의 프로퍼티, 메소드에 접근할 수 있다.
+
+```kotlin
+class A {
+    companion object {
+        fun bar() {
+            println("Companion object called")
+        }
+    }
+}
+
+fun main(args: Array<String>) {
+    A.bar()
+}
+```
+
+- 동반 객체는 private 생성자를 호출하기 좋은 장소다.
+    - 동반 객체는 정의된 클래스의 모든 private 멤버에 접근할 수 있다.
+    - 팩토리 메소드를 구현하기 적합하다.
+
+**여러 생성자를 사용하는 경우**
+
+```kotlin
+fun getFacebookName(accountId: Int) = "fb:$accountId"
+
+class User {
+    val nickname: String
+
+    constructor(email: String) {
+        nickname = email.substringBefore('@')
+    }
+
+    constructor(facebookAccountId: Int) {
+        nickname = getFacebookName(facebookAccountId)
+    }
+}
+
+fun main(args: Array<String>) {
+    val subscribingUser = User.newSubscribingUser("bob@gmail.com")
+    val facebookUser = User.newFacebookUser(4)
+    println(subscribingUser.nickname)
+}
+```
+
+**동반 객체를 사용하는 경우**
+
+```kotlin
+fun getFacebookName(accountId: Int) = "fb:$accountId"
+
+class User private constructor(val nickname: String) {
+    companion object {
+        fun newSubscribingUser(email: String) =
+            User(email.substringBefore('@'))
+
+        fun newFacebookUser(accountId: Int) =
+            User(getFacebookName(accountId))
+    }
+}
+
+fun main(args: Array<String>) {
+    val subscribingUser = User.newSubscribingUser("bob@gmail.com")
+    val facebookUser = User.newFacebookUser(4)
+    println(subscribingUser.nickname)
+}
+```
+
+- 생성자를 private으로 선언해 팩토리 메소드를 통해서만 인스턴스를 생성할 수 있다.
+- 필요한 경우 각각의 팩토리 메소드에서 다른 객체를 반환할수도 있다.
+- 동반 객체는 하위 클래스에서 오버라이드 할 수 없어 클래스를 확장할 경우 여러 생성자를 활용하는것이 더 좋다.
+
+**동반 객체를 일반 객체처럼 사용**
+
+- 동반 객체도 클래스 안에 정의된 일반 객체이기 때문에 이름을 붙이거나, 상속, 확장함수 사용 등이 가능하다.
+
+```kotlin
+interface Person {
+    fun getRole(): String
+}
+
+class Student() {
+		// 이름 붙이기, 인터페이스 구현
+    companion object Role : Person {
+        override fun getRole() = "student"
+    }
+}
+
+fun printRole(person: Person) {
+    println(person.getRole())
+}
+
+class Professor() {
+    companion object {}
+}
+
+// 확장함수
+fun Professor.Companion.getRole(): String = "professor"
+
+fun main(args: Array<String>) {
+    printRole(Student)
+    printRole(Student.Role)
+    println(Professor.getRole())
+}
+```
+
+- 자바에서 접근할 때는 `클래스이름.Companion.*` 으로 호출할 수 있다.
+
+**객체 식**
+
+- 자바의 익명 내부 클래스와 유사한 익명 객체(anonymous object)를 정의할때도 object 키워드를 활용할 수 있다.
+- 객체 식을 변수에 담아 사용할수도 있다.
+- 객체 식 내부에서 로컬 변수를 사용할 수 있고 자바와 달리 final이 아닌 변수도 사용 가능하다.
+- 익명 객체는 싱글턴이 아니다.
+
+```kotlin
+interface Person {
+    fun getRole(): String
+}
+
+fun printRole(person: Person) {
+    println(person.getRole())
+}
+
+fun main(args: Array<String>) {
+    printRole(
+        object : Person {
+            override fun getRole() = "anonymous"
+        }
+    )
+
+		// or
+
+		var defaultRole = "anonymous"
+    val roleHandler = object : Person {
+        override fun getRole(): String = defaultRole
+    }
+    printRole(roleHandler)
+}
+```

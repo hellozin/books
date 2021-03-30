@@ -730,7 +730,7 @@ class Button: View {
 
 ```kotlin
 interface User {
-	val nickname: String
+    val nickname: String
 }
 
 class PrivateUser(override val nickname: String) : User
@@ -812,7 +812,7 @@ class Client(val name: String, val postalCode: Int) {
         return name == other.name && postalCode == other.postalCode
     }
 
-		override fun hashCode(): Int = name.hashCode() * 31 + postalCode
+    override fun hashCode(): Int = name.hashCode() * 31 + postalCode
 
     override fun toString() = "Client(name=$name, postalCode=$postalCode)"
 }
@@ -999,7 +999,7 @@ interface Person {
 }
 
 class Student() {
-		// 이름 붙이기, 인터페이스 구현
+    // 이름 붙이기, 인터페이스 구현
     companion object Role : Person {
         override fun getRole() = "student"
     }
@@ -1048,9 +1048,9 @@ fun main(args: Array<String>) {
         }
     )
 
-		// or
+    // or
 
-		var defaultRole = "anonymous"
+    var defaultRole = "anonymous"
     val roleHandler = object : Person {
         override fun getRole(): String = defaultRole
     }

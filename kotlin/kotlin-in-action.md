@@ -521,7 +521,7 @@ open class RichButton : Clickable {
     fun disable() {} // 하위 클래스에서 오버라이드 할 수 없다.
     open fun animate() {} // 하위 클래스에서 오버라이드 할 수 있다.
     override fun click() {} // override 한 메소드는 기본적으로 열려있다.(open)
-		// final override fun click() {} // override 한 메소드를 열고 싶지 않은 경우 final 키워드를 사용한다.
+    // final override fun click() {} // override 한 메소드를 열고 싶지 않은 경우 final 키워드를 사용한다.
 }
 ```
 
@@ -678,7 +678,7 @@ class User constructor(_nickname: String) {
 - constructor 키워드는 주, 부 생성자 정의를 시작할 때 사용된다.
 - init 키워드는 초기화 블록을 시작한다.
 - 필요한 경우 여러 초기화 블록을 선언할 수 있다.
-- 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.([`this.name](http://this.name) = name`)
+- 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.(`this.name = name`)
 
 ```kotlin
 class User(val nickname: String, val isSubscribed: Boolean = true)

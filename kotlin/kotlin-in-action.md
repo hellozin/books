@@ -2,6 +2,7 @@
 - [Part 2. 코틀린 기초](#part-2-코틀린-기초)
 - [Part 3. 함수 정의와 호출](#part-3-함수-정의와-호출)
 - [Part 4. 클래스, 객체, 인터페이스](#part-4-클래스-객체-인터페이스)
+- [Part 5. 람다 프로그래밍](#part-5-람다-프로그래밍)
 
 # Part 1. 코틀린 소개
 
@@ -1055,5 +1056,405 @@ fun main(args: Array<String>) {
         override fun getRole(): String = defaultRole
     }
     printRole(roleHandler)
+}
+```
+
+# Part 5. 람다 프로그래밍
+
+일련의 동작을 변수에 저장하거나 다른 함수에 넘겨야 할 때 람다를 사용한다.
+
+```kotlin
+data class Person(val name: String, val age: Int)
+
+fun main(args: Array<String>) {
+    val people = listOf(
+        Person("a", 1),
+        Person("b", 2),
+        Person("c", 3)
+    )
+    println(people.maxByOrNull { it.age })      // 함수를 인자로 전달한다.
+    println(people.maxByOrNull(Person::age))    // 멤버 참조는 뒤에서 설명한다.
+}
+```
+
+**문법**
+
+- 대부분의 경우 함수에 인자로 람다를 지정하고 변수를 선언해 저장할 수도 있다.
+- 코틀린 람다 식은 중괄호로 둘러싸여 있다.
+
+```kotlin
+{ x: Int, y: Int -> x + y }
+```
+
+- 필요하다면 람다 식을 직접 호출할 수도 있다.
+  - 거의 사용되지 않고 직접 호출하는 것이 더 명확하다.
+- `run`은 인자로 받은 람다를 실행해주는 라이브러리 함수이다.
+- 코틀린 람다 호출에는 아무 오버헤드가 없다. 8장에서 배운다.
+
+```kotlin
+{ println(10) } ()
+run { println(10) }
+```
+
+- 처음 봤던 람다 식을 호출하는 방법은 다음과 같다.
+
+```kotlin
+// 가장 명시적인 호출
+people.maxByOrNull({ p: Person -> p.age })
+
+// 함수의 마지막 인자가 람다 식이면 괄호 밖으로 뺄 수 있다.
+people.maxByOrNull() { p: Person -> p.age }
+
+// 함수의 유일한 인자가 람다 식이고 괄호 밖으로 뺐다면 빈 괄호를 생략할 수 있다.
+people.maxByOrNull { p: Person -> p.age }
+
+// 타입 추론을 사용해 명시적인 타입 지정을 생략할 수 있다.
+people.maxByOrNull { p -> p.age }
+
+// 인자가 단 하나뿐이고 타입을 추론할 수 있는 경우 it 라는 이름으로 파라미터를 사용할 수 있다.
+people.maxByOrNull { it.age }
+```
+- 단, `it`를 사용할 때 람다 안에 람다가 중첩되거나 의미를 명확하게 해야하는 경우 파라미터 이름을 지정하는 것이 좋다.
+
+- 람다 식을 변수에 저장할 때는 타입 추론을 할 수 없어 타입을 명시해야 한다.
+
+```kotlin
+val getAge = { p: Person -> p.age }
+```
+
+- 본문이 여러 줄로 이뤄진 경우 마지막 식이 람다의 결과 값이 된다.
+
+```kotlin
+val sum = { x: Int, y: Int ->
+    println("sum of $x, $y")
+    x + y
+}
+```
+
+**포획된 변수 (captured variable)**
+
+- 자바의 익명 내부 클래스와 같이 코틀린 람다 식도 정의된 메소드의 로컬 변수를 람다 내부에서 사용할 수 있다.
+- 자바와 달리 final 변수가 아니어도 접근 및 수정이 가능하다.
+
+```kotlin
+fun printProblemCounts(responses: Collection<String>) {
+    var clientErrors = 0
+    var serverErrors = 0
+
+    responses.forEach {
+        if (it.startsWith("4")) {
+            clientErrors++
+        } else if (it.startsWith("5")) {
+            serverErrors++
+        }
+    }
+    println("$clientErrors client errors, $serverErrors server errors")
+}
+```
+
+- 위와 같이 람다 내부에서 사용하는 외부 변수를 포획한 변수(captured variable)라고 한다.
+  - 람다의 모든 참조가 포함된 닫힌(closed) 객체 그래프를 클로저라고 한다.
+  - 이 클로저는 람다 코드와 함께 저장된다.
+- 일반적으로 로컬 변수는 정의된 함수와 생명주기를 함께 하지만 포획된 변수는 달라질 수 있다.
+
+- 자바에서는 final 변수만 람다에서 사용할 수 있다.
+- 하지만 해당 변수만 저장하는 배열이나 클래스를 선언하고 final로 선언하면 내부 값은 변경 가능하지만 람다에서도 사용할 수 있게 된다.
+- 코틀린 코드도 내부적으로 위와 같은 방법으로 적용된다.
+
+```kotlin
+class Ref<T> (val value: T)
+val counter = Ref(0)
+val inc = { counter.value++ }
+```
+
+**멤버 참조**
+
+- 이미 선언되어 있는 함수를 람다로 넘기고 싶을 때 멤버 참조를 통해 함수를 값으로 바꿀 수 있다.
+
+```kotlin
+val getAge = Person::age
+// 위 코드는 아래와 같은 역할을 한다.
+val getAge = { person: Person -> person.age }
+```
+
+- 멤버 참조 뒤에는 괄호를 붙이지 않는다.
+- 멤버 참조는 해당 멤버를 호출하는 람다와 같은 타입이다.
+  - 함수형 언어에서는 이런 경우를 에타 변환이라고 한다.
+
+```kotlin
+people.maxByOrNull(Person::age)
+people.maxByOrNull { p -> p.age }
+people.maxByOrNull { it.age }
+```
+
+- 최상위 함수나 프로퍼티도 참조할 수 있다.
+
+```kotlin
+fun salute() = println("Salute!")
+run(::salute)
+```
+
+- 람다를 통해 인자가 여럿인 함수를 호출해야 하는 경우 참조만 제공해 더 편하게 사용할 수 있다.
+
+```kotlin
+val action = { person: Person, message: String ->
+    sendEmail(person, message)
+}
+
+val action = ::sendEmail
+
+val person = Person("Bob", 20)
+val message = "hi"
+run { action(person, message) }
+run { simpleAction(person, message) }
+```
+
+- 생성자와 확장함수도 동일하게 참조해 사용할 수 있다.
+
+```kotlin
+// 생성자 참조
+val createPerson = ::Person
+createPerson("Alice", 20)
+
+// 확장함수 참조
+fun Person.isAdult() = age >= 20
+val predicate = Person::isAdult
+```
+
+- 바운드 멤버 참조 (코틀린 1.1)
+  - 코틀린 1.0에서는 참조한 멤버함수를 호출할 때 해당 클래스의 인스턴스를 제공해야 했다.
+  - 코틀린 1.1부터는 멤버 참조를 생성할 때 인스턴스를 함께 저장하고 그에대한 멤버를 호출한다.
+  - 따라서 호출 시 수신 대상 객체를 별도로 지정하지 않아도 된다. (아래 `val p` 에 해당)
+
+```kotlin
+val person = Person("Dmitry", 20)
+
+// 코틀린 1.0
+val getAge = Person::age
+println(getAge(person)) // 수식 객체를 넘겨줘야 한다.
+
+// or
+val getAge = { person.age } // captured variable
+println(getAge())
+
+// 코틀린 1.1
+val getAge = person::age
+println(getAge())
+```
+
+**컬렉션 함수형 API**
+
+컬렉션을 다루는 코틀린 표준 라이브러리 몇개를 살펴보자.
+
+```kotlin
+// filter
+// predicate를 만족하는 원소로만 이루어진 새 컬렉션을 반환
+val people = listOf(Person("Alice", 29), Person("Bob", 31))
+println(people.filter { it.age > 30 })
+
+// map
+// 주어진 람다를 모든 원소에 적용한 결과를 모아 새 컬렉션으로 반환
+val people = listOf(Person("Alice", 29), Person("Bob", 31))
+println(people.map { it.name })
+
+// 주의: 필요하지 않은 계산을 반복하지 말자.
+// 람다는 신경써서 작업하지 않으면 굉장히 비효율적인 식이 될 수 있다.
+people.filter { it.age == people.maxBy(Person::age)!!.age } // maxBy를 매번 계산한다.
+
+val maxAge = people.maxBy(Person::age)!!.age
+people.filter { it.age == maxAge }
+
+// mapKeys, mapValues
+val numbers = mapOf(0 to "zero", 1 to "one")
+println(numbers.mapValues { it.value.toUpperCase() })
+```
+
+- `all`: 모든 원소가 predicate를 만족하는지 여부
+- `any`: 하나의 원소라도 predicate를 만족하는지 여부
+- `count`: 조건을 만족하는 원소의 수
+- `find`, `firstOrNull`: 조건을 만족하는 첫번째 원소
+
+- `all`과 `any`는 상호 배타적이기 때문에 !(not)을 쓰지 않는 것이 가독성에 좋다.
+- `count`와 `size`를 적재적소에 사용하자.
+  - `count` 는 조건을 만족하는 원소에 대한 중간 컬렉션을 생성하지 않아 효율적이다.
+
+[예제](https://try.kotlinlang.org/#/Kotlin%20in%20Action/Chapter%205/5.2/2_1_AllAnyCountAndFindApplyingAPredicateToACollection.kt)
+
+- `groupBy`는 어떤 특성에 따라 여러 그룹으로 나누고 싶을 때 사용한다.
+  - 어떤 특성이 키, 여러 그룹이 값이 맵을 반환한다.
+
+```kotlin
+val people = listOf(
+    Person("Alice", 31),
+    Person("Bob", 29),
+    Person("Carol", 31)
+)
+println(people.groupBy { it.age })
+>>> {31=[Person(name=Alice, age=31), Person(name=Carol, age=31)], 29=[Person(name=Bob, age=29)]}
+```
+
+- `flatten`: 주어진 컬렉션을 하나의 리스트로 모아서 반환
+- `flatMap`: 주어진 람다를 모든 원소에 map 하고 결과를 flatten 한 리스트를 반환
+
+```kotlin
+val books = listOf(
+    Book("Thursday Next", listOf("Jasper Fforde")),
+    Book("Mort", listOf("Terry Pratchett")),
+    Book("Good Omens", listOf("Terry Pratchett","Neil Gaiman"))
+)
+println(books.flatMap { it.authors }.toSet())
+
+val deepList = listOf(listOf(1),listOf(2),listOf(3))
+println(deepList.flatten())
+```
+
+**시퀸스와 지연 계산**
+
+앞에서 배운 map이나 filter 같은 함수는 결과 컬렉션을 즉시(eagerly) 생성하기 때문에 많은 원소에 대해 함수를 체이닝 할 경우 중간 결과 컬렉션이 많은 리소스를 사용하게 된다.
+시퀀스를 사용하면 중간 임시 컬렉션을 생성하지 않고 위와 같은 처리를 할 수 있다.
+
+- 한번에 하나씩 열거될 수 있는 원소를 표현하는 Sequence 인터페이스를 기반으로 한다.
+- Sequence 안에는 iterator라는 단 하나의 메소드가 존재한다.
+- 중간 연산은 항상 지연 계산되고 최종 연산 시 연산이 실행된다.
+
+```kotlin
+listOf(1, 2, 3, 4).asSequence()
+    .map { print("map($it) "); it * it }
+    .filter { print("filter($it) "); it % 2 == 0 }
+    .toList()   // 최종 연산이 없으면 위의 map과 filter도 실행되지 않는다.
+```
+
+- 시퀸스의 결과는 시퀸스이다.
+  - 인덱스를 통한 랜덤 엑세스 등 다른 API 메소드가 필요하면 `toList()`와 같이 컬렉션으로 변환한다.
+- 원소가 많을 때는 중간 임시 컬렉션에 대한 오버헤드가 커져 시퀸스를 사용하는 것이 유리하다.
+
+- 연산 수행 순서
+  - 모든 원소에 대해 각각의 연산을 적용하는 컬렉션과 달리 시퀸스는 각각의 원소에 대해 모든 연산을 적용하는 순서로 이루어진다.
+  - 따라서 연산을 적용하다 결과가 나오게되면 이후의 원소는 처리하지 않는다.
+
+```kotlin
+listOf(1, 2, 3, 4).asSequence()
+    .map { it * it }.find { it > 3 }
+```
+
+![image](https://user-images.githubusercontent.com/10545416/113511515-1cc3de00-959b-11eb-83c1-b94076bb41a6.png)
+
+- 연산 순서
+  - map이나 filter와 같은 연산의 순서에 따라 결과는 같지만 변환의 전체 횟수는 달라진다.
+
+```kotlin
+val people = listOf(
+    Person("A", 10),
+    Person("B", 15),
+    Person("C", 20),
+    Person("D", 25)
+)
+println(people.asSequence().map(Person::age).filter { it >= 20 }.toList())
+println(people.asSequence().filter { it.age >= 20 }.map(Person::age).toList())
+```
+
+![image](https://user-images.githubusercontent.com/10545416/113511733-5ba66380-959c-11eb-90c5-35532900e93e.png)
+
+- 자바의 스트림과 코틀린의 시퀸스는 같은 개념이다.
+- 코틀린은 자바 6에 맞춰져 있어 시퀸스를 별도로 제공하고 있다.
+- 자바의 스트림은 CPU 병렬 실행 등의 기능을 제공하기 때문에 자바 버전에 따라 적절한 방식을 선택한다.
+
+- `generateSequence` 함수로 시퀸스를 생성할 수 있다.
+
+```kotlin
+val naturalNumbers = generateSequence(0) { it + 1 }
+val numbersTo100 = naturalNumbers.takeWhile { it <= 100 }
+println(numbersTo100.sum())
+```
+
+```kotlin
+fun File.isInsideHiddenDirectory() =
+        generateSequence(this) { it.parentFile }.any { it.isHidden }
+
+fun main(args: Array<String>) {
+    val file = File("/Users/svtk/.HiddenDir/a.txt")
+    println(file.isInsideHiddenDirectory())
+}
+```
+
+**자바 함수형 인터페이스 활용**
+
+- 코틀린 람다는 자바 API에도 아무 문제없이 사용할 수 있다.
+- 추상 메소드가 단 하나 있는 인터페이스를 함수형 인터페이스 또는 SAM(single abstract method) 인터페이스라고 한다.
+- 함수형 인터페이스를 인자로 받는 자바 메소드에 코틀린 람다를 넘길 수 있다.
+  - 코틀린에서 함수를 인자로 받을때는 함수형 인터페이스가 아닌 코틀린의 함수 타입을 인자 타입으로 사용해야 한다.
+
+```kotlin
+void postponeComputation(int delay, Runnable computation);
+
+postponeComputation(1000) { println("delayed more than 1s.") }
+```
+
+- 코틀린 컴파일러가 자동으로 Runnable을 구현한 익명 클래스와 인스턴스를 만들어준다.
+- 메소드를 호출할 때마다 인스턴스가 생성되는 익명 클래스와 달리 코틀린의 람다는 변수를 포획하지 않는다는 가정 하에 기존의 익명 객체를 재사용한다.
+  - 이를 명시적으로 표현하면 아래와 같다.
+
+```kotlin
+val runnable = Runnable { println("delayed more than 1s.") } // SAM 생성자 (아래 설명한다.)
+fun handleComputation () {
+    postponeComputation(1000, runnable)
+}
+```
+
+- 만약 람다가 주변 변수를 포획하면 위와 같이 매번 호출 시 같은 인스턴스를 사용할 수 없어 새로운 인스턴스를 생성한다.
+
+- 지금까지 자바 메소드에서 코틀린을 호출하는 경우를 살펴봤는데 컬렉션을 확장한 메소드에 람다를 넘기는 경우는 다르다.
+- 대부분의 코틀린 확장함수는 inline 키워드가 붙어있고 해당 함수에 람다를 넘기면 익명 클래스도 생성되지 않는다.
+- 이 내용은 8장에서 배운다.
+
+**SAM 생성자**
+
+SAM 생성자는 컴파일러가 람다를 함수형 인터페이스의 인스턴스로 변환할 수 있게 생성해주는 함수이다. 함수형 인터페이스의 인스턴스를 반환하는 등 컴파일러가 자동으로 변환하지 못하는 경우 명시적으로 SAM 생성자를 사용할 수 있다.
+
+```kotlin
+fun createAllDoneRunnable: Runnable {
+    return Runnable { println("All Done.") }
+}
+createAllDoneRunnable().run()
+>>> All Done.
+```
+
+- SAM 생성자의 이름은 함수형 인터페이스의 이름과 같다.
+- 인스턴스를 변수에 저장해야 하는 경우에도 SAM 생성자를 활용할 수 있다.
+
+```kotlin
+val listener = OnClickListener { view -> 
+    val text = when (view.id) {
+        R.id.button1 -> "First"
+        R.id.button2 -> "Second"
+        else -> "Unknown"
+    }
+    toast(text)
+}
+```
+
+- 익명 객체와 달리 람다에는 인스턴스 자신을 가리키는 `this`가 없다.
+- 람다 안에서의 this는 람다를 둘러싼 클래스의 인스턴스를 가리킨다.
+
+**with & apply**
+
+- 수신 객체를 명시하지 않고 람다의 본문 안에서 다른 객체의 메소드를 호출할 수 있게 해주는 것을 수신 객체 지정 람다라고 한다.
+
+[예제](https://try.kotlinlang.org/#/Kotlin%20in%20Action/Chapter%205/5.5/1_1_Alphabet.kt)
+
+- with문은 특별한 구문처럼 보이지만 파라미터가 2개인 함수이다.
+  - `with(stringBuilder, {...})`
+  - 첫번째 인자로 받은 객체가 두번째 인자로 받은 람다의 수신 객체가 된다.
+  - 수신 객체의 프로퍼티와 함수에 this를 생략할 수 있지만 사용하고 싶은 외부 메소드와 이름이 충돌하면 아래와 같이 사용할 수 있다.
+    - `this@외부클래스이름.외부메소드()`
+
+- apply는 with와 유사하지만 항상 수신 객체를 반환한다.
+- apply는 확장 함수로 정의되어 있다.
+- 자바의 Builder 패턴과 같이 인스턴스를 만들며 즉시 프로퍼티를 초기화 하는 경우 유용하다
+
+```kotlin
+val person = Person().apply {
+    name = "Bob"
+    age = 20
 }
 ```

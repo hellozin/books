@@ -522,7 +522,7 @@ open class RichButton : Clickable {
     fun disable() {} // 하위 클래스에서 오버라이드 할 수 없다.
     open fun animate() {} // 하위 클래스에서 오버라이드 할 수 있다.
     override fun click() {} // override 한 메소드는 기본적으로 열려있다.(open)
-		// final override fun click() {} // override 한 메소드를 열고 싶지 않은 경우 final 키워드를 사용한다.
+    // final override fun click() {} // override 한 메소드를 열고 싶지 않은 경우 final 키워드를 사용한다.
 }
 ```
 
@@ -679,7 +679,7 @@ class User constructor(_nickname: String) {
 - constructor 키워드는 주, 부 생성자 정의를 시작할 때 사용된다.
 - init 키워드는 초기화 블록을 시작한다.
 - 필요한 경우 여러 초기화 블록을 선언할 수 있다.
-- 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.([`this.name](http://this.name) = name`)
+- 언더바(`_`) 대신 자바처럼 `this`를 사용해도 된다.(`this.name = name`)
 
 ```kotlin
 class User(val nickname: String, val isSubscribed: Boolean = true)
@@ -731,7 +731,7 @@ class Button: View {
 
 ```kotlin
 interface User {
-	val nickname: String
+    val nickname: String
 }
 
 class PrivateUser(override val nickname: String) : User
@@ -813,7 +813,7 @@ class Client(val name: String, val postalCode: Int) {
         return name == other.name && postalCode == other.postalCode
     }
 
-		override fun hashCode(): Int = name.hashCode() * 31 + postalCode
+    override fun hashCode(): Int = name.hashCode() * 31 + postalCode
 
     override fun toString() = "Client(name=$name, postalCode=$postalCode)"
 }
@@ -1000,7 +1000,7 @@ interface Person {
 }
 
 class Student() {
-		// 이름 붙이기, 인터페이스 구현
+    // 이름 붙이기, 인터페이스 구현
     companion object Role : Person {
         override fun getRole() = "student"
     }
@@ -1049,9 +1049,9 @@ fun main(args: Array<String>) {
         }
     )
 
-		// or
+    // or
 
-		var defaultRole = "anonymous"
+    var defaultRole = "anonymous"
     val roleHandler = object : Person {
         override fun getRole(): String = defaultRole
     }

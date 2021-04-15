@@ -3,6 +3,7 @@
 - [Part 3. 함수 정의와 호출](#part-3-함수-정의와-호출)
 - [Part 4. 클래스, 객체, 인터페이스](#part-4-클래스-객체-인터페이스)
 - [Part 5. 람다 프로그래밍](#part-5-람다-프로그래밍)
+- [Part 6. 코틀린 타입 시스템](#part-6-코틀린-타입-시스템)
 
 # Part 1. 코틀린 소개
 
@@ -1485,5 +1486,463 @@ val listener = OnClickListener { view ->
 val person = Person().apply {
     name = "Bob"
     age = 20
+}
+```
+
+# Part 6. 코틀린 타입 시스템
+
+**nullable 타입**
+
+- 코틀린의 타입은 기본적으로 null이 될 수 없다.
+- 예를 들면 다음과 같은 코드는 컴파일 에러가 발생한다
+
+```kotlin
+fun strLen(string: String) = string.length
+strLen(null)
+```
+
+- null을 입력받고 싶은 경우 타입 뒤에 `?`를 붙여줘야 한다.
+
+```kotlin
+strLen(string: String?) = string.length
+```
+
+- nullable 변수로 메소드를 호출할 수 없다.
+- nullable 값을 non-nullable 변수에 대입할 수 없다.
+- nullable 값을 non-nullable 함수 파라미터에 전달할 수 없다.
+
+```kotlin
+val a: String?
+a.length // x
+val b = a // x
+```
+
+- null 검사 후에는 컴파일러가 non-nullable 타입처럼 취급한다.
+- 하지만 코틀린은 nullable을 더 편리하게 처리할 수 있는 도구들을 제공한다.
+
+```kotlin
+fun strLenSafe(s: String?): Int = if (s != null) s.length else 0
+```
+
+- nullable 타입은 `?.`를 통해 안전하고 편리하게 처리할 수 있다.
+- `?.` 앞의 타입이 null이 아닐 경우에만 뒤의 operation이 실행된다.
+- 이렇게 반환된 값은 nullable(`Type?`)이다.
+- `foo?.bar()`
+  - `foo != null` -> `foo.bar()`
+  - `foo == null` -> `null`
+
+```kotlin
+if (s != null) s.length else null
+s?.length
+```
+
+- 연쇄해서 사용하면 편한 경우도 있다.
+
+```kotlin
+class Address(val streetAddress: String, val zipCode: Int,
+              val city: String, val country: String)
+
+class Company(val name: String, val address: Address?)
+
+class Person(val name: String, val company: Company?)
+
+fun Person.countryName(): String {
+   val country = this.company?.address?.country
+   return if (country != null) country else "Unknown" // 이부분은 아래에서 개선해보자.
+}
+```
+
+**앨비스 연산자**
+
+- null 대신 default 값을 사용하고 싶을 때 유용하다.
+- `foo ?: bar`
+  - `foo != null` -> `foo`
+  - `foo == null` -> `bar`
+
+```kotlin
+...
+
+fun Person.countryName(): String {
+   val address = this.company?.address ?: throw Exception("No address")
+   with (address) {
+       println(streetAddress)
+       println("$zipCode $city $country")
+   }
+}
+```
+
+**안전한 캐스트 as?**
+
+- ClassCastException을 피하려면 `is`로 타입이 변환 가능한지 확인 후 `as`를 사용해야 한다.
+- `as?` 를 통해 더 쉽게 처리할 수 있다.
+- 엘비스 연산자와 함께 사용하면 더욱 편하게 처리할 수 있다.
+- `foo as? Type`
+  - `foo is Type` -> `foo as Type`
+  - `foo !is Type` -> `null`
+
+```kotlin
+class Person(val firstName: String, val lastName: String) {
+   override fun equals(o: Any?): Boolean {
+      val otherPerson = o as? Person ?: return false
+
+      return otherPerson.firstName == firstName &&
+             otherPerson.lastName == lastName
+   }
+
+   override fun hashCode(): Int =
+      firstName.hashCode() * 37 + lastName.hashCode()
+}
+```
+
+**Non-Null Assertion**
+
+- `!!`를 붙여서 nullable 타입을 명시적으로 non-nullable 바꿀 수 있다.
+- `foo!!`
+  - `foo != null` -> foo
+  - `foo == null` -> NPE
+- NPE가 발생할 경우 null이 존재하는 라인이 아닌 해당 assertion을 선언한 라인을 가리킨다.
+
+```kotlin
+fun ignoreNulls(s: String?) {
+    val sNotNull: String = s!!  // NPE는 여기서 발생한다.
+    println(sNotNull.length)    // 여기가 아니라
+}
+```
+
+- non-null이 보장되는 경우 assertion을 통해 코드를 간소화 할 수 있다.
+
+```kotlin
+data class Person(var name: String?, var age: Int = 10)
+
+class Processor(var person: Person) {
+    fun isEnabled(): Boolean = person.name != null
+
+    fun processName() { // isEnabled()이 true일 경우에만 실행된다고 가정
+        val value = person.name!!
+        println(value.length)   // assertion이 없으면 null 체크 없이 호출할 수 없다.
+    }
+}
+```
+
+```kotlin
+// NPE가 발생할 경우 line 정보는 제공하지만 expression 정보는 제공하지 않기 때문에
+// 한줄에 여러 assertion을 쓰는 것은 자제해야 한다.
+person.company!!.address!!.country
+```
+
+**let 함수**
+
+- nullable expression을 더욱 쉽게 처리할 수 있다.
+- `foo?.let { ...it }`
+  - `foo != null` -> 람다 실행
+  - `foo == null` -> 아무일도 일어나지 않는다.
+
+```kotlin
+fun sendEmail(email: String) = println(email)
+
+var email: String? = "kotlin@mail.com"
+email = null
+// sendEmail(email)
+email?.let(::sendEmail) // email이 null이면 아무일도 수행하지 않는다.
+```
+
+**프로퍼티 lazy init**
+
+- non-null인 프로퍼티를 생성자가 아닌 메소드에서 초기화 할 수 없다.
+- 이를 가능하게 하려면 lateinit 키워드를 붙여줘야 한다.
+- val 프로퍼티는 생성자 안에서 반드시 초기화해야 하는 final 필드이기 때문에 var 프로퍼티에만 lateinit을 적용할 수 있다.
+
+```kotlin
+class MyService {
+    fun performAction(): String = "foo"
+}
+
+class MyTest {
+    private var myService: MyService? = null
+
+    @Before fun setUp() {
+        myService = MyService()
+    }
+
+    @Test fun testAction() {
+        Assert.assertEquals("foo",
+            myService!!.performAction()) // nullable이기 때문에 assertion을 사용한다.
+    }
+}
+```
+
+```kotlin
+class MyService {
+    fun performAction(): String = "foo"
+}
+
+class MyTest {
+    private lateinit var myService: MyService // lateinit 덕분에 non-null 타입을 나중에 초기화 할 수 있다.
+
+    @Before fun setUp() {
+        myService = MyService()
+    }
+
+    @Test fun testAction() {
+        Assert.assertEquals("foo",
+            myService.performAction()) // non-null이기 때문에 null 체크도 필요없다.
+    }
+}
+```
+
+**nullable 타입의 확장**
+
+- nullable 타입에 대한 확장함수를 통해 null 처리를 더욱 쉽게 할 수 있다.
+- 이는 확장함수에서만 가능하고 일반 멤버 호출은 객체 인스턴스를 통해 디스패치 되기 때문에 null 체크를 하지 않는다.
+- 일반적으로는 non-nullable한 함수를 작성하고 필요한 경우 nullable에 대한 확장을 추가하는 것이 좋다.
+
+```kotlin
+fun String?.isNullOrBlank(): Boolean = 
+    this == null || this.isBlank() // 두번째 this는 스마트 캐스트가 적용된다.
+
+fun verifyUserInput(input: String?) {
+    if (input.isNullOrBlank()) { // null에 대해 호출해도 예외가 발생하지 않는다.
+        println("Please fill in the required fields")
+    }
+}
+
+fun main(args: Array<String>) {
+    verifyUserInput(" ")
+    verifyUserInput(null)
+}
+```
+
+**타입 파라미터의 nullable**
+
+- 함수나 클래스의 모든 타입 파라미터는 기본적으로 nullable하다.
+
+```kotlin
+// T의 타입은 Any?로 추론된다.
+fun <T> printHash(t: T) {
+    println(t?.hashCode()) // t는 nullable이다.
+}
+```
+
+- non-nullable로 지정하고 싶은 경우 타입 상한(upper bound)를 지정해야 한다.
+- 이에대한 자세한 내용은 9장 제네릭스에서 배운다.
+
+```kotlin
+fun <T:Any> printHash(t: T) {
+    println(t?.hashCode()) // t는 non-nullable이다.
+}
+```
+
+**nullable과 자바**
+
+- Nullable에 대한 애노테이션이 있는 경우 아래와 같이 처리된다.
+  - `@Nullable String` -> `String?`
+  - `@NotNull String` -> `String`
+- Nullable 애노테이션이 없는 경우는 플랫폼 타입으로 처리된다.
+  - 플랫폼 타입은 nullable, non-nullable 모두 처리가 가능하다.
+  - 모든 책임은 개발자에게 있다.
+  - public 함수의 경우 코틀린 컴파일러가 non-nullable 파라미터와 수신 객체에 대한 null 검사를 추가하기 때문에 자바 클래스를 사용할 때는 null 체크 후 사용하는 것이 좋다.
+  - 플랫폼 타입에 대한 표현은 `Type!`으로 처리된다.
+  - 자바의 인터페이스나 클래스 메소드를 오버라이드 할 때 nullable을 선택할 수 있다.
+
+**코틀린 원시 타입**
+
+- 코틀린은 원시 타입과 래퍼 타입을 구분하지 않는다.
+- 따라서 원시 타입 값에 대해 메소드를 호출할 수 있다.
+
+```kotlin
+val progress: Int = 120
+val percent = progress.coerceIn(0, 100)
+```
+
+- 원시 타입을 nullable로 선언할 수도 있다.
+  - `Int?`, `Boolean?` 등
+  - 자바에서는 래퍼 타입으로 처리된다.
+- null 체크를 한 뒤에 일반적인 값처럼 사용이 가능하다.
+
+```kotlin
+data class Person(val name: String,
+                  val age: Int? = null) {
+
+    fun isOlderThan(other: Person): Boolean? {
+        if (age == null || other.age == null)
+            return null
+        return age > other.age
+    }
+}
+```
+
+**숫자 변환**
+
+- 코틀린은 숫자를 자동 변환하지 않는다.
+- 대신 Boolean을 제외한 원시 타입에 대해 변환 함수를 제공한다.
+  - `toByte()`, `toShort()`, `toChar()` 등
+- 원시 타입에 대한 리터럴은 다음과 같다.
+  - Long: 100L
+  - Double: 0.1, 1.0e10, 1.5e-20
+  - Float: 3.14f
+  - Hex: 0xCAFEBENE
+  - Bin: 0b00010001
+  - 코틀린 1.1 부터 숫자에 밑줄(`_`)을 추가할 수 있다. (1_000)
+
+- 타입이 정해진 변수나 파라미터로 전달할때는 자동으로 변환이 된다.
+
+```kotlin
+fun foo(l: Long) = println(l)
+val b: Byte = 1
+val l = b + 1L
+foo(100)
+```
+
+- ?? 코틀린은 overflow 검사에 대해 추가 비용이 들지 않는다.
+
+**Any**
+
+- 코틀린의 최상위 타입으로 자바의 Object와 유사하다.
+  - 자바의 Object는 코틀린에서 `Any!`(플랫폼 타입)으로 처리된다.
+
+**Unit**
+
+- 의미없는 반환을 의미하며 자바의 void와 유사하다.
+- 반환 타입을 선언하지 않으면 Unit 타입을 반환한다.
+- 자바의 void와 달리 Unit을 타입 인자로 쓸 수 있어 반환이 필요없는 제네릭 파라미터를 처리할 때 편하다.
+
+```kotlin
+interface Processor<T> {
+    fun process(): T
+}
+
+class NoResultProcessor: Processor<Unit> {
+    override fun process() {
+        ... without return expression // return 문을 명시하지 않으면 컴파일러가 return Unit을 넣어준다.
+    }
+}
+```
+
+**Nothing**
+
+- 반환 값이라는 개념이 전혀 의미가 없을 때 사용된다.
+- 함수의 반환 타입이나 반환 타입으로 쓰일 타입 파라미터로만 쓸 수 있다.
+
+```kotlin
+fun fail(message: String): Nothing {
+    throw IllegalStateException(message)
+}
+
+val address = company.address ?: fail("No address")
+println(address.city) // 컴파일러가 fail의 반환타입을 보고 address가 non-nullable임을 알게 된다.
+```
+
+**nullable과 컬렉션**
+
+- 컬렉션의 타입 인자도 `?`를 통해 nullable을 결정한다.
+
+```kotlin
+fun readNumbers(reader: BufferedReader): List<Int?> {
+    val result = ArrayList<Int?>()
+    for (line in reader.lineSequence()) {
+        try {
+            val number = line.toInt()
+            result.add(number)
+        }
+        catch(e: NumberFormatException) {
+            result.add(null)
+        }
+    }
+    return result
+}
+```
+
+- `?`의 위치에 따라 nullable의 범위가 바뀐다.
+  - `List<Int?>`, `List<Int>?`
+
+![image](https://user-images.githubusercontent.com/10545416/114746861-27e0f000-9d8b-11eb-9bd0-3665045d0b4f.png)
+
+**읽기 전용 컬렉션과 변경 가능한 컬렉션**
+
+- 코틀린 컬렉션은 읽기와 쓰기에 대한 인터페이스를 분리했다.
+  - `kotlin.collections.Collection`에는 읽기 연산만 존재한다.
+  - 쓰기 연산은 `kotlin.collections.MutableCollection`을 사용한다.
+
+![image](https://user-images.githubusercontent.com/10545416/114747615-ff0d2a80-9d8b-11eb-9bca-4ab013892851.png)
+
+- 가능하면 항상 읽기 전용 컬렉션을 사용해라.
+  - 읽기 전용 컬렉션은 변경 가능 컬렉션일 수 있다는 점을 명심해라. (반드시 thread-safe 하지 않다.)
+
+![image](https://user-images.githubusercontent.com/10545416/114747727-1d732600-9d8c-11eb-9e90-30f7a20117ee.png)
+
+- 자바의 컬렉션에 대해 읽기 전용, 변경 가능이라는 표현을 제공하고 자바의 컬렉션이 변경 가능 인터페이스를 상속하는 형태로 제공한다.
+
+![image](https://user-images.githubusercontent.com/10545416/114748214-a5593000-9d8c-11eb-999c-c20b69fd0cd8.png)
+
+- 컬렉션 생성 함수에 따른 분류
+
+![image](https://user-images.githubusercontent.com/10545416/114748261-b1dd8880-9d8c-11eb-9df2-626a361f2978.png)
+
+- setOf()와 mapOf()는 자바 표준 라이브러리의 인스턴스를 반환하기 때문에 내부적으로는 변경 가능한 클래스이지만 미래에는 불변 인스턴스로 변경될 수 있다.
+
+- 자바에서는 읽기 전용 컬렉션을 지원하지 않기 때문에 코틀린에서 읽기 전용 컬렉션을 넘기면 변경이 가능하다.
+- 이에 대한 처리는 개발자가 신경써야 한다.
+- 위 문제는 널이 아닌 원소로 이루어진 컬렉션에도 적용된다.
+
+**컬렉션과 플랫폼 타입**
+
+- 자바에서 선언한 컬렉션 변수는 코틀린에서 플랫폼 타입으로 본다.
+  - 해당 컬렉션에 대한 읽기 전용, 변경 가능 여부를 선택할 수 있다.
+- 일반적인 경우 문제가 될 일이 별로 없다.
+- 컬렉션 타입을 시그니처로 가지는 자바 메소드를 오버라이드 하는 경우 신경쓸 부분이 생긴다.
+  - 컬렉션의 nullable 여부
+  - 컬렉션의 원소의 nullable 여부
+  - 컬렉션의 mutable 여부
+  
+p294-p296 참고
+
+**객체의 배열과 원시 타입의 배열**
+
+```kotlin
+fun main(args: Array<String>) {
+    for (i in args.indices) { // 인덱스 값을 알기위해 array.indices 확장 함수 사용
+         println("Argument $i is: ${args[i]}") // array[index]로 배열 원소 접근
+    }
+}
+```
+
+- 배열을 만드는 다양한 방법
+  - arrayOf(1,2,3)
+  - arrayOfNulls<Int>(3)
+  - Array<Int>(10) { i -> i + 1 }
+    - 람다는 배열의 인덱스를 받아서 해당 위치에 들어갈 원소를 반환한다.
+
+```kotlin
+val letters = Array<String>(26) { i -> ('a' + i).toString() }
+```
+
+- 컬렉션을 배열로 만들때는 `toTypedArray`를 사용하면 편하다.
+
+```kotlin
+val strings = listOf("a", "b", "c")
+println("%s/%s/%s".format(*strings.toTypedArray())) // *: 스프레드 연산자
+```
+
+- 배열 타입의 타입 인자는 항상 객체 타입이 된다.
+  - `Array<Int>` -> `Integer[]`
+- 원시 타입의 배열을 표현하려면 각각의 타입에 맞는 배열 클래스를 사용한다.
+  - `IntArray` -> `int[]`
+  - `ByteArray` -> `byte[]`
+  - `CharArray` -> `char[]`
+  - 등
+
+```kotlin
+IntArray(5) // [0,0,0,0,0]
+intArrayOf(0,1,2) // [0,1,2]
+IntArray(3) { i -> (i*2) } // [0,2,4]
+```
+
+- 컬렉션에서 사용한 확장 함수, map, filter 등을 Array에도 사용할 수 있다.
+
+```kotlin
+fun main(args: Array<String>) {
+    args.forEachIndexed { index, element ->
+        println("Argument $index is: $element")
+    }
 }
 ```

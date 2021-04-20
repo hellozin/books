@@ -4,6 +4,7 @@
 - [Part 4. 클래스, 객체, 인터페이스](#part-4-클래스-객체-인터페이스)
 - [Part 5. 람다 프로그래밍](#part-5-람다-프로그래밍)
 - [Part 6. 코틀린 타입 시스템](#part-6-코틀린-타입-시스템)
+- [Part 7. 연산자 오버로딩과 기타 관례](#part-7-연산자-오버로딩과-기타-관례)
 
 # Part 1. 코틀린 소개
 
@@ -1946,3 +1947,410 @@ fun main(args: Array<String>) {
     }
 }
 ```
+
+# Part 7. 연산자 오버로딩과 기타 관례
+
+- 기존 언어에서 제공하는 문법과 미리 정의한 함수를 연결해 주는 기법을 코틀린에서는 관례(convention) 이라고 한다.
+  - 클래스에 `plus`라는 메소드를 정의하면 인스턴스에 대해 `+` 연산을 사용할 수 있다.
+- 위와같은 기능을 타입에 의존하는 자바와 달리 코틀린에서 컨벤션을 사용하는 이유는 기존의 자바 클래스를 코틀린 언어에 적용하기 위해서이다.
+  - 기존 자바 클래스가 새로운 인터페이스를 구현하도록 할 수 없기 때문에 확장함수를 구현하면서 컨벤션에 따라 이름을 붙이면 쉽게 처리가 가능하다.
+
+**산술 연산자**
+
+- `BigInteger`에서 `add` 대신 `+`를 사용하거나 컬렉션에 원소를 추가할 때 `+=`를 사용할 수 있다면 편할것이다.
+- `plus`라는 특별한 이름의 함수를 정의하고 `+` 연산자로 이 함수를 호출한다.
+- 연산자를 오버로딩할때는 함수앞에 `operation` 키워드가 있어야 한다.
+
+```kotlin
+data class Point(val x: Int, val y: Int) {
+    operator fun plus(other: Point): Point {
+        return Point(x + other.x, y + other.y)
+    }
+}
+
+fun main(args: Array<String>) {
+    val p1 = Point(10, 20)
+    val p2 = Point(30, 40)
+    println(p1 + p2)
+}
+```
+
+- 멤버 함수 대신 확장 함수로 정의할 수도 있다.
+- 확장 함수로 정의하는 경우가 더 일반적인 패턴이다.
+
+```kotlin
+data class Point(val x: Int, val y: Int)
+
+operator fun Point.plus(other: Point): Point {
+    return Point(x + other.x, y + other.y)
+}
+```
+
+- 오버로딩을 하더라도 연산 우선순위는 기존과 같다.
+- 오버로딩이 가능한 이항 산술 연산자는 다음과 같다.
+  - a * b : times
+  - a / b : div
+  - a % b : mod(1.1부터 rem)
+    - rem : remainder
+  - a + b : plus
+  - a - b : minus
+
+- 피연산자가 같은 타입일 필요는 없다.
+- 다만 교환 법칙은 성립하지 않는다.
+  - `a op b` != `b op a`, `b op a`에 대한 오버라이드를 추가해야 가능하다.
+
+```kotlin
+operator fun Point.times(scale: Double): Point {
+    return Point((x * scale).toInt(), (y * scale).toInt())
+}
+
+fun main(args: Array<String>) {
+    val p = Point(10, 20)
+    println(p * 1.5)
+}
+```
+
+- 일반 함수와 동일하게 오버로딩이 가능하다.
+- 비트 연산은 코틀린에서 제공하지 않아 오버라이딩도 불가능하다.
+  - 대신 아래의 일반 함수를 제공하기 때문에 필요한 경우 이를 활용하면 된다.
+    - and: 비트 곱
+    - or: 비트 합
+    - xor: 비트 배타 합
+    - 등등
+
+**복합 대입 연산자**
+
+- `+=`와 같이 여러 산술연산을 합친 연산자에 대해 설명한다.
+
+```kotlin
+operator fun Point.plus(other: Point): Point {
+    return Point(x + other.x, y + other.y)
+}
+
+fun main(args: Array<String>) {
+    var point = Point(1, 2)
+    point += Point(3, 4) // point는 새로운 인스턴스가 할당된다.
+    println(point)
+}
+```
+
+- 변수의 참조를 변경하지 않고 값을 수정하고 싶은 경우는 Unit 타입을 반환하는 `plusAssign`과 같은 함수를 정의하면 된다.
+
+```kotlin
+operation fun <T> MutableCollection<T>.plusAssign(element: T) {
+    this.add(element)
+}
+
+val numbers = ArrayList<Int>()
+numbers += 42
+```
+
+- 문법상 `plus`와 `plusAssign`을 모두 정의하고 둘 다 `+=`에 사용 가능한 경우 컴파일 에러가 발생한다.
+- 클래스의 변경 가능성을 판단해 적절한 함수만 정의하는 것이 좋다.
+- 코틀린 표준 라이브러리는 컬렉션에 대해 아래와 같은 접근법을 제공한다.
+  - `+`, `-`: 새로운 컬렉션 반환
+  - `+=`, `-=`:
+    - mutable 컬렉션: 현재 컬렉션 객체의 상태를 수정
+    - read only 컬렉션: 변경을 적용한 복사본 반환
+
+**단항 연산자**
+
+- 단항 연산자도 이항 연산자와 크게 다르지 않다.
+- 단항 연산자 오버라이드 함수는 인자를 받지 않는다.
+- 오버로딩이 가능한 단항 산술 연산자는 다음과 같다.
+  - +a : unaryPlus
+  - -a : unaryMinus
+  - !a : not
+  - ++a, a++ : inc
+  - --a, a-- : dec
+  - unary: "유너리" 라고 읽네요
+
+```kotlin
+operator fun Point.unaryMinus(): Point {
+    return Point(-x, -y)
+}
+
+fun main(args: Array<String>) {
+    val p = Point(10, 20)
+    println(-p)
+}
+```
+
+```kotlin
+operator fun BigDecimal.inc() = this + BigDecimal.ONE
+
+fun main(args: Array<String>) {
+    var bd = BigDecimal.ZERO
+    println(bd++) // 0
+    println(++bd) // 2
+}
+```
+
+**비교 연산자 오버로딩: equals**
+
+- == : equals
+  - 내부에서 자동으로 null 검사를 하기 때문에 nullable 타입에도 사용할 수 있다.
+  - `a == b` -> `a?.equals(b) ?: (b == null)`
+  - `equals`는 `Any`에 정의된 메소드이므로 override가 필요하다.
+  - `Any`의 `equals`에 `operator` 키워드가 이미 명시되어 있기 때문에 오버라이드하는 메소드에는 추가하지 않아도 된다.
+  - `Any`의 `equals`가 확장 함수보다 우선순위가 높아 `equals`는 확장 함수로 정의할 수 없다.
+- === : 두 객체가 같은 인스턴스인지 확인한다.
+  - `equals` 구현 시 자기 자신과의 비교를 최적화 할때 사용되는 경우가 많다.
+  - 이 연산자는 오버로딩 할 수 없다.
+
+```kotlin
+class Point(val x: Int, val y: Int) {
+    override fun equals(obj: Any?): Boolean {
+        if (obj === this) return true
+        if (obj !is Point) return false
+        return obj.x == x && obj.y == y
+    }
+}
+```
+
+**순서 연산자: compareTo**
+
+- Comparable 인터페이스를 구현하면 순서 연산자를 오버라이딩 할 수 있다.
+- `a >= b` -> `a.compareTo(b) >= 0`
+
+```kotlin
+class Person(val firstName: String, val lastName: String) : Comparable<Person> {
+    override fun compareTo(other: Person): Int {
+        return compareValuesBy(this, other, 
+            Person::lastName, Person::firstName)
+    }
+}
+```
+
+**인덱스 연산자**
+
+- 배열 원소 뿐만 아니라 맵에 접근할 때도 대괄호를 사용할 수 있는 이유는 인덱스 연산자 덕분이다.
+  - `val value = map[key]`, `mutableMap[key] = newValue`
+- `get`, `set` 메소드로 오버라이드 할 수 있다.
+
+```kotlin
+operator fun Point.get(index: Int): Int {
+    return when(index) {
+        0 -> x
+        1 -> y
+        else ->
+            throw IndexOutOfBoundsException("Invalid coordinate $index")
+    }
+}
+
+fun main(args: Array<String>) {
+    val p = Point(10, 20)
+    println(p[1])
+}
+```
+
+**in**
+
+- `a in b` -> `b.contains(a)`
+
+```kotlin
+data class Point(val x: Int, val y: Int)
+
+data class Rectangle(val upperLeft: Point, val lowerRight: Point)
+
+operator fun Rectangle.contains(p: Point): Boolean {
+    return p.x in upperLeft.x until lowerRight.x &&
+           p.y in upperLeft.y until lowerRight.y
+}
+
+fun main(args: Array<String>) {
+    val rect = Rectangle(Point(10, 20), Point(50, 50))
+    println(Point(20, 30) in rect)
+    println(Point(5, 5) in rect)
+}
+```
+
+**rangeTo**
+
+- `start..end` -> `start.rangeTo(end)`
+- `Comparable` 인터페이스를 구현하면 아래와 같은 `rangeTo` 함수를 사용할 수 있다.
+  - `operator fun <T: Comparable<T>> T.rangeTo(that: T): ClosedRange<T>`
+
+**iterator**
+
+- `for 루프` 내의 `in`은 앞에서 다룬 `in`과는 의미가 다르다.
+- `for (x in list) {...}` -> `list.iterator()` -> `hasNext(), next()`
+
+```kotlin
+operator fun ClosedRange<LocalDate>.iterator(): Iterator<LocalDate> =
+    // LocalDate에 대한 Iterator를 구현한다
+    object : Iterator<LocalDate> {
+        var current = start
+
+        // compareTo 관례를 활용한다
+        override fun hasNext() =
+            current <= endInclusive
+
+        override fun next() = current.apply {
+            current = plusDays(1)
+        }
+    }
+
+fun main(args: Array<String>) {
+    val newYear = LocalDate.ofYearDay(2017, 1)
+    val daysOff = newYear.minusDays(1)..newYear
+    for (dayOff in daysOff) { println(dayOff) }
+}
+```
+
+**구조 분해 선언과 component()**
+
+- 구조 분해 선언을 위해 `componentN()`이라는 함수를 호출한다.
+- `val (a, b) = p` -> `val a = p.component1() \ val b = p.component2()`
+- data 클래스의 주 생성자 프로퍼티는 컴파일러가 자동으로 `componentN()` 함수를 만들어준다.
+- 여러 값을 한번에 반환하고 싶을 경우 모든 값을 저장하는 데이터 클래스를 만들고 이를 반환하면 된다.
+
+```kotlin
+data class NameComponents(val name: String, val extension: String)
+
+fun splitFilename(fullName: String): NameComponents {
+    val (name, extension) = fullName.split('.', limit = 2)
+    return NameComponents(name, extension)
+}
+
+fun main(args: Array<String>) {
+    val (name, ext) = splitFilename("example.kt")
+    println(name)
+    println(ext)
+}
+```
+
+- 코틀린 표준 라이브러리는 맨 앞의 다섯 원소에 대한 componentN을 제공한다.  
+- 위 예제의 `NameComponents`처럼 별도 클래스를 생성하지 않고 `Pair`, `Triple`을 사용할 수도 있다.
+
+**구조 분해 선언과 루프**
+
+- 위에서 배운 관례를 활용해 아래 예제를 더 잘 이해할 수 있다.
+
+```kotlin
+fun printEntries(map: Map<String, String>) {
+    // in -> map에 대한 iteration
+    // (key, value) -> Map.Entry에 대한 구조 분해 선언
+    for ((key, value) in map) {
+        println("$key -> $value")
+    }
+}
+```
+
+**위임 프로퍼티**
+
+- 필드에 값을 저장할 때 처리하는 로직을 직접 구현할 수 있다.
+  - 값을 필드가 아닌 DB, 세션, 맵 등에 저장할 수 있다.
+- 이러한 로직(위임 객체)은 직접 구현할 수도, 코틀린이 제공하는 것을 사용할 수도 있다.
+
+```kotlin
+class Foo {
+    var p: Type by Delegate() // by 라는 키워드로 위임을 명시한다
+}
+
+class Delegate {
+    operator fun getValue(...) {...}
+    operator fun setValue(..., value: Type) {...}
+}
+
+// TO-BE
+class Foo {
+    private val delegate = Delegate()
+    var p: Type
+    set(value: Type) = delegate.setValue(..., value)
+    get() = delegate.getValue(...)
+}
+```
+
+**by lazy()를 통한 초기화 지연**
+
+- 먼저 배운 내용을 바탕으로 초기화 지연을 구현해보자.
+
+```kotlin
+class Email { /*...*/ }
+fun loadEmails(person: Person): List<Email> {
+    println("Load emails for ${person.name}")
+    return listOf(/*...*/)
+}
+
+class Person(val name: String) {
+    private var _emails: List<Email>? = null
+
+    val emails: List<Email>
+       get() {
+           if (_emails == null) {
+               _emails = loadEmails(this)
+           }
+           return _emails!!
+       }
+}
+
+fun main(args: Array<String>) {
+    val p = Person("Alice")
+    p.emails // print o
+    p.emails // print x
+}
+```
+
+- 지연 초기화가 필요한 필드가 많아지면 코드 수정이 귀찮아진다.
+- thread-safe 하지 않다.
+- 위임 프로퍼티로 이런 문제들을 해결할 수 있다.
+  - 데이터 저장에 쓰이는 backing 프로퍼티와 오직 한번만 초기화되는 getter 로직을 캡슐화한다.
+  - 인자로 넘긴 람다를 값을 초기화 할 때 사용한다.
+  - 기본적으로 thread-safe하다
+
+```kotlin
+class Person(val name: String) {
+    val emails by lazy { loadEmails(this) }
+}
+```
+
+**위임 프로퍼티 구현**
+
+[예제 참고](https://try.kotlinlang.org/#/Kotlin%20in%20Action/Chapter%207/7.5/3_1_ImplementingDelegatedProperties.kt)
+
+**프로퍼티 값을 맵에 저장**
+
+- `p.name` -> `_attributes.getValue(p, prop)` -> `_attributes[prop.name]`
+
+```kotlin
+class Person {
+    private val _attributes = hashMapOf<String, String>()
+
+    fun setAttribute(attrName: String, value: String) {
+        _attributes[attrName] = value
+    }
+
+    // as-is
+    val name: String get() = _attributes["name"]!!
+    // to-be
+    val name: String by _attributes
+}
+
+fun main(args: Array<String>) {
+    val p = Person()
+    val data = mapOf("name" to "Dmitry", "company" to "JetBrains")
+    for ((attrName, value) in data)
+       p.setAttribute(attrName, value)
+    println(p.name)
+}
+```
+
+**프레임워크와 위임 프로퍼티**
+
+```kotlin
+// 테이블을 표현하는 Users는 object 키워드로 싱글턴 객체가 되었다
+object Users: IdTable() {
+    val name = varchar("name", length=50).index()
+    val age = integer("age)
+}
+
+// 
+class User(id: EntityId): Entity(id) {
+    var name: String by Users.name
+    var age: Int by Users.age
+}
+```
+
+- `user.age += 1` -> `user.ageDelegate.setValue(user.ageDelegate.getValue() + 1)`
+  - 대략적인 흐름

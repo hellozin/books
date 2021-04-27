@@ -5,6 +5,7 @@
 - [Part 5. 람다 프로그래밍](#part-5-람다-프로그래밍)
 - [Part 6. 코틀린 타입 시스템](#part-6-코틀린-타입-시스템)
 - [Part 7. 연산자 오버로딩과 기타 관례](#part-7-연산자-오버로딩과-기타-관례)
+- [Part 9. 제네릭스](#part-9-제네릭스)
 
 # Part 1. 코틀린 소개
 
@@ -2354,3 +2355,393 @@ class User(id: EntityId): Entity(id) {
 
 - `user.age += 1` -> `user.ageDelegate.setValue(user.ageDelegate.getValue() + 1)`
   - 대략적인 흐름
+
+# Part 9. 제네릭스
+
+사용 지점 변성? use-site variance
+
+**제네릭 타입 파라미터**
+
+- 제네릭 타입의 인스턴스를 만들려면 타입 인자가 필요하다.
+- 코틀린은 타입 인자를 추론할 수 있다.
+  - `listOf("Dmitry", "Svetlana")`
+- 추론을 할 수 없는 빈 컬렉션의 경우 변수 혹은 함수에 타입을 명시해야 한다.
+
+```kotlin
+val readers: MutableList<String> = mutableListOf()
+val readers = mutableListOf<String>()
+```
+
+**제네릭 함수와 프로퍼티**
+
+- 제네릭 함수는 타입 파라미터를 수신 객체와 반환 타입에 사용할 수 있다.
+
+![image](https://user-images.githubusercontent.com/10545416/116100766-36fb6280-a6e8-11eb-8282-84fea860a774.png)
+
+```kotlin
+val authors = listOf("Dmitry", "Svetlana")
+val readers = mutableListOf<String>(/*...*/)
+
+fun <T> List<T>.filter(predicate: (T) -> Boolean): List<T>
+readers.filter { it !in authors }
+```
+
+- 제네릭 확장 함수와 마찬가지로 확장 프로퍼티도 선언할 수 있다.
+- 일반 프로퍼티에는 여러 타입의 값을 저장할 수 없기 때문에 제네릭을 적용할 수 없다.
+  - `val <T> x: T = TODO()`
+
+```kotlin
+val <T> List<T>.penultimate: T
+    get() = this[size - 2]
+
+println(listOf(1,2,3,4).penultimate)
+>>> 3
+```
+
+**제네릭 클래스**
+
+- 클래스 이름 뒤에 `<>`를 붙이면 제네릭하게 만들 수 있다.
+
+```kotlin
+interface List<T> {
+    operator fun get(index: Int): T
+}
+```
+
+- 제네릭 클래스를 확장할 때 타입을 명시할 수도, 상위 클래스의 타입 파라미터를 사용할 수도 있다.
+  - 타입 파라미터를 재사용할 때는 다른 이름을 사용해도 된다.
+  - 타입을 명시할 때 자기 자신의 타입을 사용할 수 있다.
+
+```kotlin
+// 타입 명시
+class StringList: List<String> { ... }
+// 타입 파라미터 재사용
+class ArrayList<T>: List<T> { ... } 
+```
+
+**타입 파라미터 제약**
+
+- 클래스나 함수에 사용할수 있는 타입을 제한하는 기능
+- 상한(upper bound)를 지정하면 해당 상한 혹은 상한 타입의 하위 타입만 사용할 수 있다.
+ 
+```kotlin
+// upper bound: Number
+fun <T: Number> List<T>.sum(): T
+```
+
+- 상한을 지정하면 타입 파라미터를 상한 타입의 값으로 취급 가능하다.
+
+```kotlin
+fun <T : Number> oneHalf(value: T): Double {
+    // T 타입인 value로 Number 타입의 함수인 toDouble을 호출한다
+    return value.toDouble() / 2.0
+}
+```
+
+- 상한 타입을 이용해 최댓값을 구하는 함수를 만들어보자.
+
+```kotlin
+fun <T: Comparable<T>> max(first: T, second: T): T {
+    return if (first > second) first else second
+}
+
+fun main(args: Array<String>) {
+    println(max("kotlin", "java"))
+}
+```
+
+- 둘 이상의 제약을 가하는 경우는 아래와 같이 사용한다.
+
+```kotlin
+// CharSequence와 Appendable을 구현해야 한다.
+fun <T> ensureTrailingPeriod(seq: T)
+        where T : CharSequence, T : Appendable {
+    if (!seq.endsWith('.')) {
+        seq.append('.')
+    }
+}
+```
+
+**Non-nullable로 한정하기**
+
+- 아무것도 상한을 정하지 않으면 `Any?`를 상한으로 지정한 것과 같다.
+- 따라서 non-nullable로 상한을 정하고 싶으면 상한으로 `Any`를 지정하면 된다.
+
+```kotlin
+class Processor<T: Any> { ... }
+```
+
+**제네릭 타입 소거와 캐스트**
+
+- 자바는 제네릭 사용 시 컴파일 타임까지 타입 파라미터를 유지하고 런타임에는 유지하지 않는다.
+  - unbounded Type(`<?>`, `<T>`)는 Object로 변환한다.
+  - bound Type(`<E extends Comparable>`)의 경우 bound Type(`Comparable`)으로 변환한다
+  - 제네릭을 사용 할 수 있는 클래스, 인터페이스, 메소드에만 적용한다.
+  - 필요한 경우 type casting과 bridge method를 사용한다.
+- 코틀린에서는 함수를 inline으로 만들면 타입 소거가 이루어지지 않는다.
+  - 이를 실체화(reify)라고 한다.
+
+```kotlin
+val list1: List<String> = listOf("a","b")
+val list2: List<Int> = listOf(1,2,3)
+```
+
+- 올바른 타입의 값이 들어가도록 보장하는 것은 컴파일러가 처리한다.
+
+![image](https://user-images.githubusercontent.com/10545416/116109697-00c1e100-a6f0-11eb-80ea-12e09d32de3f.png)
+
+- 타입 소거로 인해 리스트의 타입을 런타임에 확인할 수 없다.
+  - `if (value is List<String>) { ... } // error!`
+- 값이 리스트인지 확인하기 위해서는 스타 프로젝션(star projection)을 사용한다.
+  - `if (value is List<*>) {...}`
+  - 타입 파라미터가 2개 이상이면 모두 `*`로 채워준다.
+  - 뒤에서 더 자세하게 배운다.
+
+- `as`, `as?` 캐스팅에도 제네릭을 사용할 수 있지만 타입 소거가 발생하는 만큼 주의해서 사용해야 한다.
+
+```kotlin
+fun printSum(c: Collection<*>) {
+    val intList = c as? List<Int>
+            ?: throw IllegalArgumentException("List is expected")
+    println(intList.sum())
+}
+
+printSum(listOf(1,2,3)) // OK
+printSum(setOf(1,2,3)) // List가 아니기 때문에 Exception 발생
+printSum(listOf("a","b","c")) // as? 캐스팅은 성공하지만 sum() 메소드에서 Exception 발생
+```
+
+**인라인 함수와 실체화**
+
+- 앞에서 살펴본 것과 같이 제네릭 함수는 호출 시 쓰인 타입 인자를 알 수 없다.
+  - `fun <T> isA(value: Any) = value is T // ERROR!`
+- 인라인 함수의 타입 파라미터는 실체화(reify)되기 때문에 타입 인자를 알 수 있다.
+  - `inline fun <reified T> isA(value: Any) = value is T // OK`
+  - `isA`를 인라인 함수로 만들고 타입 파라미터를 `reified로 지정했다.
+
+- 실체화 한 파라미터를 사용하는 예를 살펴보자
+- 왜 인라인 함수에서만 실체화한 타입 인자를 쓸 수 있을까?
+  - 인라인 함수는 타입 파라미터가 아닌 구체적인 타입에 대한 바이트코드를 함수에 삽입한다.
+  - 자바 코드에서는 reified 타입 파라미터를 사용하는 inline 함수를 호출할 수 없다.
+
+```kotlin
+inline fun <reified T>
+    Iterable<*>.filterIsInstance(): List<T> {
+    val dest = mutableListOf<T>()
+    for (element in this) {
+        if (element is T) {
+            dest.add(element)
+        }
+    }
+    return dest
+}
+
+val items = listOf("one", 2, "three")
+println(items.filterIsInstance<String>())
+```
+
+- 8장에서 람다를 인라이닝 함으로써 이익이 큰 경우에만 인라인 함수를 사용하라고 설명했다.
+- 9장을 통해 성능 향상이 아닌 실체화한 타입 파라미터를 사용하기 위한 목적으로 inline을 사용할 수 있다는 것을 배웠다.
+
+**실체화한 타입 파라미터로 클래스 참조**
+
+```kotlin
+// AS-IS
+var serviceImpl = ServiceLoader.load(Service::class.java)
+// TO-BE
+inline fun <reified T> loadService() {
+    return ServiceLoader.load(T::class.java)
+}
+val serviceImpl = loadService<Service>()
+```
+
+**실체화한 타입 파라미터의 제약**
+
+- 실체화한 타입 파라미터는 유용한 도구이지만 몇가지 제약이 있다.
+- 우선 실체화한 타입 파라미터를 사용할 수 있는 경우는 다음과 같다.
+  - 타입 검사와 캐스팅 (`is`, `!is`, `as`, `as?`)
+  - 10장의 코틀린 리플렉션 API(`::class`)
+  - `java.lang.Class` 가져오기(`::class.java`)
+  - 함수 호출 시 타입 인자로 사용
+- 사용할 수 없는 경우는 다음과 같다.
+  - 타입 파라미터 클래스의 인스턴스 생성
+  - 타입 파라미터 클래스의 동반 객체(companion object) 메소드 호출
+  - 실체화한 타입 파라미터를 매개변수로 가지는 함수에 실체화하지 않은 타입을 인자로 넘기기
+  - 클래스, 프로퍼티, 인라인 함수가 아닌 파라미터에 reified를 지정하기
+- 마지막 제약으로 인해 실체화한 타입 파라미터를 사용하는 함수는 자신에게 전달되는 모든 람다와 함께 인라이닝 된다.
+  - 인라이닝을 하면 안되는 경우 `noinline` 변경자를 통해 막을 수 있다.
+
+**변성(variance)**
+
+- 기저 타입이 같고 타입 인자가 다른 여러 타입의 관계를 설명하는 개념
+  - `List<String>` 과 `List<Any>`
+
+**변성이 존재하는 이유**
+
+- `Any` 타입 파라미터에 `String`을 인자로 넘길수는 있지만 `List<String>` -> `List<Any>`는 안된다.
+  
+```kotlin
+fun addAnswer(list: MutableList<Any>) {
+    list.add(42)
+}
+
+val strings = mutableListOf("a","b")
+addAnswer(strings) // 이게 컴파일이 된다면
+println(strings.maxBy { it.length }) // 여기서 Exception이 발생할 것이다
+```
+
+**클래스, 타입, 하위 타입**
+
+- 제네릭 클래스가 아닌 클래스의 이름은 타입으로 쓸 수 있다.
+- 제네릭 클래스의 타입을 위해서는 타입 인자를 주입해야 하고 무수히 많은 타입이 생성된다.
+  - `List<Int>`, `List<String>`, `List<List<Int>>`
+- 타입 A에 타입 B의 값을 넣어도 문제 없는 경우 B는 A의 하위 타입(subtype)이라고 한다.
+- 반대의 경우를 상위 타입(supertype)이라고 한다.
+- 컴파일러는 변수 대입이나 함수 인자 전달 시 매번 하위 타입 검사를 수행한다.
+
+```kotlin
+val i: Int = 10
+val n: Number = i // 컴파일 성공
+
+fun f(s: String) {...}
+f(i) // 컴파일 에러
+```
+
+- 간단한 경우 하위 타입은 하위 클래스와 같다.
+- nullable 타입은 하위 타입과 하위 클래스가 같지 않다.
+
+![image](https://user-images.githubusercontent.com/10545416/116122472-ca3e9300-a6fc-11eb-90dc-0cffb1fdbd7b.png)
+
+**공변성**
+
+- A가 B의 하위 타입이면 List<A>는 List<B>의 하위 타입이면 List는 공변적이다.
+- 하위 타입 관계가 유지된다고도 한다.
+- 공변적임을 명시하려면 `out` 키워드를 사용한다.
+
+```kotlin
+interface Producer<out T> {
+    fun produce(): T
+}
+```
+
+- `out` 키워드로 공변성을 명시하지 않으면 하위 클래스로 처리할 수 없다.
+
+```kotlin
+open class Animal {
+    fun feed() {...}
+}
+
+class Herd<T: Animal> {
+    val size: Int get() = ...
+    operator fun get(i: Int): T {...}
+}
+
+fun feedAll(animals: Herd<Animal>) {
+    for (i in 0 untile animals.size) {
+        animals[i].feed()
+    }
+}
+
+class Cat: Animal() {
+    fun cleanLitter() {...}
+}
+
+fun takeCareOfCats(cats: Herd<Cat>) {
+    for (i in 0 untile cats.size) {
+        cats[i].cleanLitter()
+        feedAll(cats) // Error!
+    }
+}
+
+// Herd<T: Animal>을 Herd<out T: Animal>로 바꿔야 공변적으로 동작한다.
+```
+
+- `out` 키워드로 공변성을 부여하면 타입 파라미터 T를 out 위치에만 사용 가능하고 in 위치에서는 사용하지 못한다.
+- 생성자 파라미터는 in도 out도 아닌 영역에 있다.
+  - `class Herd<out T: animal>(vararg animals: T) {...}`
+  - val, var 키워드를 생성자 파라미터에 사용하면 읽기 전용 프로퍼티는 out, 변경 가능 프로퍼티는 out, in 위치에 해당한다.
+  - private 메소드는 in도 out도 아닌 영역에 있다.
+
+![image](https://user-images.githubusercontent.com/10545416/116124478-4d60e880-a6ff-11eb-8601-5c3e9bd4d4b3.png)
+
+**반 공변성**
+
+- 하위 타입 관계가 뒤집힐 때 반 공변 상태에 있다고 말한다.
+- Comparator 클래스의 compare 메소드를 보면 T의 값을 소비하기만 해 in 위치에만 쓰이고 있다.
+- Comparator의 하위 타입에 속하는 모든 값을 비교할 수 있다.
+
+```kotlin
+interface Comparator<in T> {
+    fun compare(e1: T, e2: T): Int {...}
+}
+```
+
+![image](https://user-images.githubusercontent.com/10545416/116126436-9ade5500-a701-11eb-8316-fd48cf682845.png)
+
+- 공변적, 반공변적인 타입 파라미터를 모두 가지고 있는 대표적인 클래스는 Function이다.
+
+```kotlin
+interface Function1<in P, out R> {
+    operator fun invoke(p: P): R
+}
+```
+
+**사용 지점 변성**
+
+- 위에서 설명한 것처럼 클래스를 선언하는 동시에 변성을 지정하는 것을 선언 지점 변셩(declaration-site variance) 이라고 한다.
+- 타입 파라미터를 사용할 때 마다 변성을 지정하는 것을 사용 지점 변성(use-site variance)이라고 한다.
+
+```kotlin
+// AS-IS
+// 이 예제에서 T는 R의 하위 타입이어야 한다
+fun <T: R, R> copyData(src: MutableList<T>,
+                        dst: MutableList<R>) {
+    for (item in src) {
+        dst.add(item)
+    }
+}
+
+// TO-BE
+// out이 앞에 붙은 T 타입은 in 위치에 사용하는 메소드를 호출하지 않는다는 의미이다
+fun <T> copyData(src: MutableList<out T>,
+                        dst: MutableList<T>) {
+    for (item in src) {
+        dst.add(item)
+    }
+}
+// or
+fun <T> copyData(src: MutableList<T>,
+                        dst: MutableList<in T>) {
+    for (item in src) {
+        dst.add(item)
+    }
+}
+```
+
+- 파라미터 타입, 로컬 변수 타입, 함수 반환 타입 등에 타입 파라미터가 쓰이는 경우 in, out 변경자를 사용할 수 있다.
+- 이때, 타입 프로젝션이 일어난다.
+  - MutableList를 프로젝션 한(제약을 가한) 타입으로 만든다.
+  - copyData 함수는 MutableList의 반환타입이 T인 메소드만 호출할 수 있다.
+- 프로젝션 타입의 메소드 중 호출하지 못하는 메소드는 일반 타입을 사용하면 된다.
+- 사용 지점 변성은 자바의 bounded wildcard와 똑같다.
+  - `MutableList<out T>` -> `MutableList<? extends T>`
+  - `MutableList<in T>` -> `MutableList<? super T>`
+
+**스타 프로젝션**
+
+- 앞에서 인자 정보가 없을 때 스타 프로젝션을 사용했다.
+- `MutableList<*>`는 `MutableList<Any?>`와 같지 않다.
+  - `*`: 특정 타입의 원소만을 담지만 그 타입이 뭔지 모른다.
+  - `Any?`: 모든 타입의 원소를 담는다.
+
+- 타입이 굳이 필요없는 경우 스타 프로젝션을 사용할 수 있다.
+
+```kotlin
+fun printFirst(list: List<*>) {
+    if (list.isNotEmpty()) {
+        println(list.first()) // Any?를 반환하지만 크게 상관이 없다
+    }
+}
+```
+
+[Validator 예제 참고](https://github.com/Kotlin/kotlin-in-action/blob/master/src/ch09/9.3.6.2_4_StarProjection3.kt)
